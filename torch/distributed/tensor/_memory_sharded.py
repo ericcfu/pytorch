@@ -532,3 +532,273 @@ class MemoryShardedDTensor(DTensor):
             output = output.permute(inv_perm).contiguous()
 
         return output
+
+
+def distribute_storage(
+    dtensor: DTensor,
+    dim: int,
+    mesh_dim: int | str,
+) -> MemoryShardedDTensor:
+    """
+    Create a MemoryShardedDTensor by sharding a DTensor's storage along a dimension.
+
+    This function takes a DTensor and shards its underlying storage along the
+    specified dimension across devices in the given mesh dimension. Unlike
+    DTensor's logical sharding, this physically partitions the storage to
+    reduce per-device memory usage.
+
+    Args:
+        dtensor: The input DTensor to shard. Must be replicated on the target
+            mesh dimension.
+        dim: The tensor dimension along which to shard storage. Must be in
+            range [-ndim, ndim).
+        mesh_dim: The mesh dimension (name or index) to use for sharding.
+
+    Returns:
+        A MemoryShardedDTensor with storage sharded across devices.
+
+    Raises:
+        ValueError: If dim is out of range or mesh_dim doesn't exist.
+
+    Example:
+        >>> # FSDP-style sharding: shard parameters along dim 0
+        >>> mesh = init_device_mesh("cuda", (4,), mesh_dim_names=("dp",))
+        >>> param = distribute_tensor(torch.randn(16, 8), mesh, [Replicate()])
+        >>> sharded = distribute_storage(param, dim=0, mesh_dim="dp")
+        >>> sharded.shape  # Local shape: (4, 8)
+        >>> sharded.full_shape  # Original shape: (16, 8)
+    """
+    from torch.distributed.tensor.placement_types import Replicate
+
+    device_mesh = dtensor.device_mesh
+    ndim = dtensor.ndim
+
+    # Normalize negative dim
+    if dim < 0:
+        dim = dim + ndim
+
+    # Validate dim is in range
+    if dim < 0 or dim >= ndim:
+        raise ValueError(f"dim {dim} is out of range for tensor with {ndim} dimensions")
+
+    # Resolve mesh_dim to index if it's a string
+    if isinstance(mesh_dim, str):
+        mesh_dim_names = device_mesh.mesh_dim_names
+        if mesh_dim_names is None or mesh_dim not in mesh_dim_names:
+            raise ValueError(
+                f"mesh_dim '{mesh_dim}' not found in device mesh. "
+                f"Available dimensions: {mesh_dim_names}"
+            )
+        mesh_dim_name = mesh_dim
+        mesh_dim_idx = mesh_dim_names.index(mesh_dim)
+    else:
+        mesh_dim_idx = mesh_dim
+        if mesh_dim_idx < 0 or mesh_dim_idx >= device_mesh.ndim:
+            raise ValueError(
+                f"mesh_dim {mesh_dim_idx} is out of range for mesh with "
+                f"{device_mesh.ndim} dimensions"
+            )
+        mesh_dim_names = device_mesh.mesh_dim_names
+        mesh_dim_name = mesh_dim_names[mesh_dim_idx] if mesh_dim_names else "default"
+
+    # Get process group and world size for the mesh dimension
+    process_group = device_mesh.get_group(mesh_dim_idx)
+    world_size = device_mesh.size(mesh_dim_idx)
+    local_rank = device_mesh.get_local_rank(mesh_dim_idx)
+
+    # Get the full tensor data (replicated on all ranks)
+    full_tensor = dtensor.to_local()
+
+    # Compute shard sizes
+    full_size_on_dim = full_tensor.size(dim)
+    # Use ceiling division for padded shard size
+    padded_shard_size = (full_size_on_dim + world_size - 1) // world_size
+
+    # Compute actual shard size for this rank
+    start_idx = local_rank * padded_shard_size
+    end_idx = min(start_idx + padded_shard_size, full_size_on_dim)
+    actual_shard_size = max(0, end_idx - start_idx)
+
+    # Extract the local shard
+    if actual_shard_size > 0:
+        local_shard = full_tensor.narrow(dim, start_idx, actual_shard_size)
+        # Make contiguous copy to own the storage
+        local_shard = local_shard.contiguous()
+    else:
+        # Empty shard for ranks beyond the tensor size
+        shard_shape = list(full_tensor.shape)
+        shard_shape[dim] = 0
+        local_shard = full_tensor.new_empty(shard_shape)
+
+    # Preserve requires_grad
+    if full_tensor.requires_grad:
+        local_shard = local_shard.requires_grad_(True)
+
+    # Create storage sharding spec (single-dim is a special case of block sharding)
+    storage_spec = BlockStorageShardingSpec(
+        orig_size=full_tensor.size(),
+        orig_stride=full_tensor.stride(),
+        shard_dims=(dim,),
+        mesh_dims=(mesh_dim_name,),
+        padded_shard_sizes=(padded_shard_size,),
+        actual_shard_sizes=(actual_shard_size,),
+        mesh_dim_indices=(mesh_dim_idx,),
+    )
+
+    # Create placements - replicated on all dimensions
+    placements = tuple(Replicate() for _ in range(device_mesh.ndim))
+
+    return MemoryShardedDTensor._create(
+        local_tensor=local_shard,
+        device_mesh=device_mesh,
+        storage_spec=storage_spec,
+        process_group=process_group,
+        placements=placements,
+    )
+
+
+def distribute_block_storage(
+    dtensor: DTensor,
+    shard_dims: list[int] | tuple[int, ...],
+    mesh_dims: list[int | str] | tuple[int | str, ...] | None = None,
+) -> MemoryShardedDTensor:
+    """
+    Create a MemoryShardedDTensor by block-sharding a DTensor's storage.
+
+    This function shards the tensor across multiple dimensions simultaneously,
+    creating a block/cube partitioning where each rank holds a multi-dimensional
+    slice of the original tensor.
+
+    Args:
+        dtensor: The input DTensor to shard. Must be replicated on all target
+            mesh dimensions.
+        shard_dims: The tensor dimensions to shard. Each dimension is mapped
+            to the corresponding mesh dimension in mesh_dims.
+        mesh_dims: The mesh dimensions to use for sharding. If None, uses
+            mesh dimensions 0, 1, 2, ... (first len(shard_dims) mesh dims).
+            Can be names (str) or indices (int).
+
+    Returns:
+        A MemoryShardedDTensor with block-sharded storage.
+
+    Raises:
+        ValueError: If len(shard_dims) != len(mesh_dims), or if any dimension
+            is out of range.
+
+    Example:
+        >>> # Block sharding: tensor [8, 4] on mesh (dp=4, tp=2) -> [2, 2] per rank
+        >>> mesh = init_device_mesh("cuda", (4, 2), mesh_dim_names=("dp", "tp"))
+        >>> param = distribute_tensor(torch.randn(8, 4), mesh, [Replicate(), Replicate()])
+        >>> sharded = distribute_block_storage(param, shard_dims=[0, 1])
+        >>> sharded.shape  # (2, 2)
+        >>> sharded.full_shape  # (8, 4)
+    """
+    from torch.distributed.tensor.placement_types import Replicate
+
+    device_mesh = dtensor.device_mesh
+    ndim = dtensor.ndim
+
+    # Default: use first len(shard_dims) mesh dimensions
+    if mesh_dims is None:
+        mesh_dims = tuple(range(len(shard_dims)))
+
+    # Ensure tuples
+    shard_dims = tuple(shard_dims)
+    mesh_dims = tuple(mesh_dims)
+
+    # Validate lengths match
+    if len(shard_dims) != len(mesh_dims):
+        raise ValueError(
+            f"shard_dims and mesh_dims must have same length, "
+            f"got {len(shard_dims)} and {len(mesh_dims)}"
+        )
+
+    # Normalize negative dims and validate
+    normalized_shard_dims = []
+    for d in shard_dims:
+        if d < 0:
+            d = d + ndim
+        if d < 0 or d >= ndim:
+            raise ValueError(f"shard_dim {d} is out of range for {ndim}D tensor")
+        normalized_shard_dims.append(d)
+    shard_dims = tuple(normalized_shard_dims)
+
+    # Resolve mesh_dims to indices and names
+    mesh_dim_indices = []
+    mesh_dim_names_list = []
+    for md in mesh_dims:
+        if isinstance(md, str):
+            names = device_mesh.mesh_dim_names
+            if names is None or md not in names:
+                raise ValueError(f"mesh_dim '{md}' not found in device mesh")
+            mesh_dim_names_list.append(md)
+            mesh_dim_indices.append(names.index(md))
+        else:
+            if md < 0 or md >= device_mesh.ndim:
+                raise ValueError(f"mesh_dim {md} out of range for mesh")
+            mesh_dim_indices.append(md)
+            names = device_mesh.mesh_dim_names
+            mesh_dim_names_list.append(names[md] if names else f"dim_{md}")
+
+    mesh_dim_indices = tuple(mesh_dim_indices)
+    mesh_dim_names_tuple = tuple(mesh_dim_names_list)
+
+    # Get the full tensor data
+    full_tensor = dtensor.to_local()
+
+    # Compute shard sizes and extract local block
+    padded_shard_sizes = []
+    actual_shard_sizes = []
+    local_slices = [slice(None)] * ndim
+
+    for tensor_dim, mesh_dim_idx in zip(shard_dims, mesh_dim_indices):
+        world_size = device_mesh.size(mesh_dim_idx)
+        local_rank = device_mesh.get_local_rank(mesh_dim_idx)
+
+        full_size = full_tensor.size(tensor_dim)
+        padded_shard_size = (full_size + world_size - 1) // world_size
+
+        start_idx = local_rank * padded_shard_size
+        end_idx = min(start_idx + padded_shard_size, full_size)
+        actual_shard_size = max(0, end_idx - start_idx)
+
+        padded_shard_sizes.append(padded_shard_size)
+        actual_shard_sizes.append(actual_shard_size)
+
+        # Build slice for this dimension
+        if actual_shard_size > 0:
+            local_slices[tensor_dim] = slice(start_idx, end_idx)
+        else:
+            local_slices[tensor_dim] = slice(0, 0)
+
+    # Extract local block
+    local_block = full_tensor[tuple(local_slices)].contiguous()
+
+    # Preserve requires_grad
+    if full_tensor.requires_grad:
+        local_block = local_block.requires_grad_(True)
+
+    # Create BlockStorageShardingSpec
+    storage_spec = BlockStorageShardingSpec(
+        orig_size=full_tensor.size(),
+        orig_stride=full_tensor.stride(),
+        shard_dims=shard_dims,
+        mesh_dims=mesh_dim_names_tuple,
+        padded_shard_sizes=tuple(padded_shard_sizes),
+        actual_shard_sizes=tuple(actual_shard_sizes),
+        mesh_dim_indices=mesh_dim_indices,
+    )
+
+    # Use the first mesh dimension's process group as primary
+    primary_pg = device_mesh.get_group(mesh_dim_indices[0])
+
+    # Placements: Replicate on all dimensions
+    placements = tuple(Replicate() for _ in range(device_mesh.ndim))
+
+    return MemoryShardedDTensor._create(
+        local_tensor=local_block,
+        device_mesh=device_mesh,
+        storage_spec=storage_spec,
+        process_group=primary_pg,
+        placements=placements,
+    )

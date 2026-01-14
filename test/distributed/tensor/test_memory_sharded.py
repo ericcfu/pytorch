@@ -791,5 +791,141 @@ class TestGetAllGatherInput(DTensorTestBase):
         self.assertEqual(all_gather_input.dtype, torch.float16)
 
 
+class TestDistributeStorage(DTensorTestBase):
+    """Tests for distribute_storage factory function."""
+
+    @property
+    def world_size(self) -> int:
+        return 4
+
+    @with_comms
+    def test_distribute_storage_basic(self):
+        """Test distribute_storage creates MemoryShardedDTensor."""
+        from torch.distributed.tensor import distribute_storage, distribute_tensor
+
+        device_mesh = init_device_mesh(self.device_type, (self.world_size,))
+
+        full_tensor = torch.randn(16, 8, device=self.device_type)
+        dtensor = distribute_tensor(full_tensor, device_mesh, [Replicate()])
+
+        msdt = distribute_storage(dtensor, dim=0, mesh_dim=0)
+
+        self.assertIsInstance(msdt, MemoryShardedDTensor)
+        self.assertEqual(msdt.shape, torch.Size([4, 8]))
+        self.assertEqual(msdt.full_shape, torch.Size([16, 8]))
+
+    @with_comms
+    def test_distribute_storage_dim1(self):
+        """Test distribute_storage on dim 1."""
+        from torch.distributed.tensor import distribute_storage, distribute_tensor
+
+        device_mesh = init_device_mesh(self.device_type, (self.world_size,))
+
+        full_tensor = torch.randn(8, 16, device=self.device_type)
+        dtensor = distribute_tensor(full_tensor, device_mesh, [Replicate()])
+
+        msdt = distribute_storage(dtensor, dim=1, mesh_dim=0)
+
+        self.assertEqual(msdt.shape, torch.Size([8, 4]))
+        self.assertEqual(msdt.full_shape, torch.Size([8, 16]))
+
+    @with_comms
+    def test_distribute_storage_with_mesh_dim_name(self):
+        """Test distribute_storage with mesh_dim as string name."""
+        from torch.distributed.tensor import distribute_storage, distribute_tensor
+
+        device_mesh = init_device_mesh(
+            self.device_type, (self.world_size,), mesh_dim_names=("dp",)
+        )
+
+        full_tensor = torch.randn(16, 8, device=self.device_type)
+        dtensor = distribute_tensor(full_tensor, device_mesh, [Replicate()])
+
+        msdt = distribute_storage(dtensor, dim=0, mesh_dim="dp")
+
+        self.assertIsInstance(msdt, MemoryShardedDTensor)
+        self.assertEqual(msdt.storage_spec.mesh_dims[0], "dp")
+
+    @with_comms
+    def test_distribute_storage_roundtrip(self):
+        """Test distribute_storage followed by unshard recovers data."""
+        from torch.distributed.tensor import distribute_storage, distribute_tensor
+
+        device_mesh = init_device_mesh(self.device_type, (self.world_size,))
+
+        full_tensor = torch.randn(16, 8, device=self.device_type)
+        dtensor = distribute_tensor(full_tensor, device_mesh, [Replicate()])
+
+        msdt = distribute_storage(dtensor, dim=0, mesh_dim=0)
+        unsharded = msdt.unshard()
+
+        self.assertTrue(
+            torch.allclose(unsharded.to_local(), full_tensor)
+        )
+
+    @with_comms
+    def test_distribute_storage_uneven(self):
+        """Test distribute_storage with uneven tensor size."""
+        from torch.distributed.tensor import distribute_storage, distribute_tensor
+
+        device_mesh = init_device_mesh(self.device_type, (self.world_size,))
+
+        # 13 rows, 4 ranks: ceil(13/4) = 4 padded shard size
+        full_tensor = torch.randn(13, 8, device=self.device_type)
+        dtensor = distribute_tensor(full_tensor, device_mesh, [Replicate()])
+
+        msdt = distribute_storage(dtensor, dim=0, mesh_dim=0)
+
+        self.assertEqual(msdt.full_shape, torch.Size([13, 8]))
+        self.assertEqual(msdt.storage_spec.padded_shard_sizes[0], 4)
+
+        # Unshard and verify
+        unsharded = msdt.unshard()
+        self.assertTrue(
+            torch.allclose(unsharded.to_local(), full_tensor)
+        )
+
+
+class TestDistributeBlockStorage(DTensorTestBase):
+    """Tests for distribute_block_storage factory function."""
+
+    @property
+    def world_size(self) -> int:
+        return 4
+
+    @with_comms
+    def test_distribute_block_storage_single_dim(self):
+        """Test distribute_block_storage with single dimension (like distribute_storage)."""
+        from torch.distributed.tensor import distribute_block_storage, distribute_tensor
+
+        device_mesh = init_device_mesh(self.device_type, (self.world_size,))
+
+        full_tensor = torch.randn(16, 8, device=self.device_type)
+        dtensor = distribute_tensor(full_tensor, device_mesh, [Replicate()])
+
+        msdt = distribute_block_storage(dtensor, shard_dims=[0], mesh_dims=[0])
+
+        self.assertIsInstance(msdt, MemoryShardedDTensor)
+        self.assertEqual(msdt.shape, torch.Size([4, 8]))
+        self.assertEqual(msdt.full_shape, torch.Size([16, 8]))
+
+    @with_comms
+    def test_distribute_block_storage_roundtrip(self):
+        """Test distribute_block_storage followed by unshard recovers data."""
+        from torch.distributed.tensor import distribute_block_storage, distribute_tensor
+
+        device_mesh = init_device_mesh(self.device_type, (self.world_size,))
+
+        full_tensor = torch.randn(16, 8, device=self.device_type)
+        dtensor = distribute_tensor(full_tensor, device_mesh, [Replicate()])
+
+        msdt = distribute_block_storage(dtensor, shard_dims=[0])
+        unsharded = msdt.unshard()
+
+        self.assertTrue(
+            torch.allclose(unsharded.to_local(), full_tensor)
+        )
+
+
 if __name__ == "__main__":
     run_tests()

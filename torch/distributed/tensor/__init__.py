@@ -16,6 +16,8 @@ from torch.distributed.tensor._api import (
 )
 from torch.distributed.tensor._memory_sharded import (
     BlockStorageShardingSpec,
+    distribute_block_storage,
+    distribute_storage,
     MemoryShardedDTensor,
 )
 from torch.distributed.tensor.placement_types import (
@@ -37,6 +39,8 @@ __all__ = [
     "DTensor",
     "distribute_tensor",
     "distribute_module",
+    "distribute_storage",
+    "distribute_block_storage",
     "MemoryShardedDTensor",
     "BlockStorageShardingSpec",
     "Shard",
@@ -93,6 +97,8 @@ if MemoryShardedDTensor not in _util_foreach_supported_types:
 DTensor.__module__ = "torch.distributed.tensor"
 distribute_tensor.__module__ = "torch.distributed.tensor"
 distribute_module.__module__ = "torch.distributed.tensor"
+distribute_storage.__module__ = "torch.distributed.tensor"
+distribute_block_storage.__module__ = "torch.distributed.tensor"
 MemoryShardedDTensor.__module__ = "torch.distributed.tensor"
 BlockStorageShardingSpec.__module__ = "torch.distributed.tensor"
 ones.__module__ = "torch.distributed.tensor"

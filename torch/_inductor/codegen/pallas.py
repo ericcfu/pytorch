@@ -124,6 +124,49 @@ class PallasKernelOverrides(OpOverrides):
     with JAX numpy broadcasting semantics.
     """
 
+    # Binary operations with on-demand reshape for broadcast compatibility
+    @staticmethod
+    def add(a: str, b: str) -> str:
+        a, b = V.kernel._ensure_broadcast_compatible(a, b)
+        result = f"{a} + {b}"
+        V.kernel._track_binary_op_shape(result, a, b)
+        return result
+
+    @staticmethod
+    def sub(a: str, b: str) -> str:
+        a, b = V.kernel._ensure_broadcast_compatible(a, b)
+        result = f"{a} - {b}"
+        V.kernel._track_binary_op_shape(result, a, b)
+        return result
+
+    @staticmethod
+    def mul(a: str, b: str) -> str:
+        a, b = V.kernel._ensure_broadcast_compatible(a, b)
+        result = f"{a} * {b}"
+        V.kernel._track_binary_op_shape(result, a, b)
+        return result
+
+    @staticmethod
+    def truediv(a: str, b: str) -> str:
+        a, b = V.kernel._ensure_broadcast_compatible(a, b)
+        result = f"{a} / {b}"
+        V.kernel._track_binary_op_shape(result, a, b)
+        return result
+
+    @staticmethod
+    def floordiv(a: str, b: str) -> str:
+        a, b = V.kernel._ensure_broadcast_compatible(a, b)
+        result = f"{a} // {b}"
+        V.kernel._track_binary_op_shape(result, a, b)
+        return result
+
+    @staticmethod
+    def mod(a: str, b: str) -> str:
+        a, b = V.kernel._ensure_broadcast_compatible(a, b)
+        result = f"{a} % {b}"
+        V.kernel._track_binary_op_shape(result, a, b)
+        return result
+
     @staticmethod
     def sin(x: str) -> str:
         return f"jnp.sin({x})"
@@ -162,47 +205,69 @@ class PallasKernelOverrides(OpOverrides):
 
     @staticmethod
     def exp(x: str) -> str:
-        return f"jnp.exp({x})"
+        result = f"jnp.exp({x})"
+        V.kernel._track_unary_op_shape(result, x)
+        return result
 
     @staticmethod
     def exp2(x: str) -> str:
-        return f"jnp.exp2({x})"
+        result = f"jnp.exp2({x})"
+        V.kernel._track_unary_op_shape(result, x)
+        return result
 
     @staticmethod
     def expm1(x: str) -> str:
-        return f"jnp.expm1({x})"
+        result = f"jnp.expm1({x})"
+        V.kernel._track_unary_op_shape(result, x)
+        return result
 
     @staticmethod
     def log(x: str) -> str:
-        return f"jnp.log({x})"
+        result = f"jnp.log({x})"
+        V.kernel._track_unary_op_shape(result, x)
+        return result
 
     @staticmethod
     def log10(x: str) -> str:
-        return f"jnp.log10({x})"
+        result = f"jnp.log10({x})"
+        V.kernel._track_unary_op_shape(result, x)
+        return result
 
     @staticmethod
     def log2(x: str) -> str:
-        return f"jnp.log2({x})"
+        result = f"jnp.log2({x})"
+        V.kernel._track_unary_op_shape(result, x)
+        return result
 
     @staticmethod
     def log1p(x: str) -> str:
-        return f"jnp.log1p({x})"
+        result = f"jnp.log1p({x})"
+        V.kernel._track_unary_op_shape(result, x)
+        return result
 
     @staticmethod
     def sqrt(x: str) -> str:
-        return f"jnp.sqrt({x})"
+        result = f"jnp.sqrt({x})"
+        V.kernel._track_unary_op_shape(result, x)
+        return result
 
     @staticmethod
     def rsqrt(x: str) -> str:
-        return f"(1.0 / jnp.sqrt({x}))"
+        result = f"(1.0 / jnp.sqrt({x}))"
+        V.kernel._track_unary_op_shape(result, x)
+        return result
 
     @staticmethod
     def abs(x: str) -> str:
-        return f"jnp.abs({x})"
+        result = f"jnp.abs({x})"
+        V.kernel._track_unary_op_shape(result, x)
+        return result
 
     @staticmethod
     def neg(x: str) -> str:
-        return f"(-{x})"
+        result = f"(-{x})"
+        V.kernel._track_unary_op_shape(result, x)
+        return result
 
     @staticmethod
     def floor(x: str) -> str:
@@ -230,18 +295,36 @@ class PallasKernelOverrides(OpOverrides):
 
     @staticmethod
     def pow(a: str, b: str) -> str:
-        return f"jnp.power({a}, {b})"
+        a, b = V.kernel._ensure_broadcast_compatible(a, b)
+        result = f"jnp.power({a}, {b})"
+        V.kernel._track_binary_op_shape(result, a, b)
+        return result
 
     @staticmethod
     def maximum(a: str, b: str) -> str:
-        return f"jnp.maximum({a}, {b})"
+        a, b = V.kernel._ensure_broadcast_compatible(a, b)
+        result = f"jnp.maximum({a}, {b})"
+        V.kernel._track_binary_op_shape(result, a, b)
+        return result
 
     @staticmethod
     def minimum(a: str, b: str) -> str:
-        return f"jnp.minimum({a}, {b})"
+        a, b = V.kernel._ensure_broadcast_compatible(a, b)
+        result = f"jnp.minimum({a}, {b})"
+        V.kernel._track_binary_op_shape(result, a, b)
+        return result
 
     @staticmethod
     def where(cond: str, a: str, b: str) -> str:
+        # Ensure all three operands are broadcast compatible
+        # First make a and b compatible
+        a, b = V.kernel._ensure_broadcast_compatible(a, b)
+        # Then make cond compatible with the result of a/b
+        cond, a = V.kernel._ensure_broadcast_compatible(cond, a)
+        # After making cond compatible with a, check a and b again
+        a, b = V.kernel._ensure_broadcast_compatible(a, b)
+        # Also check cond with b to be sure
+        cond, b = V.kernel._ensure_broadcast_compatible(cond, b)
         return f"jnp.where({cond}, {a}, {b})"
 
     @staticmethod
@@ -302,14 +385,20 @@ class PallasKernelOverrides(OpOverrides):
         """Convert a constant value to JAX representation."""
         jax_dtype = torch_dtype_to_jax(dtype)
         if dtype == torch.bool:
-            return "True" if val else "False"
-        # Handle special float values
-        if isinstance(val, float):
+            result = "True" if val else "False"
+        elif isinstance(val, float):
+            # Handle special float values
             if math.isnan(val):
-                return "jnp.nan"
-            if math.isinf(val):
-                return "jnp.inf" if val > 0 else "-jnp.inf"
-        return f"jnp.array({val}, dtype={jax_dtype})"
+                result = "jnp.nan"
+            elif math.isinf(val):
+                result = "jnp.inf" if val > 0 else "-jnp.inf"
+            else:
+                result = f"jnp.array({val}, dtype={jax_dtype})"
+        else:
+            result = f"jnp.array({val}, dtype={jax_dtype})"
+        # Track scalar shape for constants
+        V.kernel.var_shapes[result] = ()
+        return result
 
     @staticmethod
     def real(x: str) -> str:
@@ -878,7 +967,8 @@ class PallasKernel(SIMDKernel):
     - Use async_compile.pallas path to compile and load Python code.
 
     For GPU (Mosaic backend):
-    - Use masked loads/stores with power-of-2 block sizes to handle non-power-of-2 shapes
+    - Use TMA (Tensor Memory Accelerator) for automatic OOB masking
+    - Falls back to legacy padding approach for reductions, broadcasting, non-contiguous tensors
     """
 
     overrides = PallasKernelOverrides  # type: ignore[assignment]
@@ -889,11 +979,12 @@ class PallasKernel(SIMDKernel):
         # Determine device type once at initialization
         device = V.graph.get_current_device_or_throw()
         self.is_gpu = device.type == "cuda"
-        self.use_masked_ops: bool | None = None
-        # Enable warpgroup padding for GPU to handle non-aligned tensor sizes
-        # Mosaic GPU requires tensor sizes to be multiples of 128 (WARPGROUP_SIZE)
-        self.use_warpgroup_padding = self.is_gpu
-        self.tensor_masks = {}  # Map tensor name to mask variable name
+        # Use TMA (Tensor Memory Accelerator) for GPU to handle non-aligned tensor sizes
+        # TMA automatically masks OOB accesses, eliminating the need for explicit
+        # padding to multiples of 128. Uses lax.fori_loop with direct TMA primitives.
+        self.use_emit_pipeline = self.is_gpu  # Enable TMA approach for GPU
+        # Legacy: warpgroup padding (enabled when TMA approach is disabled)
+        self.use_warpgroup_padding = self.is_gpu and not self.use_emit_pipeline
         # Track which output param each store uses: list of (out_ptr_name, store_line)
         self.store_with_output: list[tuple[str, str]] = []
         # Track load index expressions for argmax/argmin axis detection
@@ -903,6 +994,725 @@ class PallasKernel(SIMDKernel):
         # Track if any load in this kernel used transpose
         # Used to avoid double transpose (load + store)
         self.has_transposed_load = False
+        # Canonical output shape for this kernel (computed lazily)
+        # Used to reshape intermediate buffers for proper broadcasting
+        self._canonical_output_shape: Optional[list[int]] = None
+        # Track shapes of CSE variables for on-demand reshape at binary ops
+        # Maps variable name (e.g., "tmp0") to shape tuple (e.g., (2, 16, 64))
+        self.var_shapes: dict[str, tuple[int, ...]] = {}
+
+    def _get_canonical_output_shape(self) -> Optional[list[int]]:
+        """
+        Get the canonical output shape for this kernel.
+
+        This uses the same principled logic as iteration variable emission:
+        1. Find a buffer (output or input) whose numel matches an iteration var length
+        2. That buffer's shape defines the N-D structure (reshape target)
+        3. Combine with other iteration dimensions to get full canonical shape
+
+        This is used to reshape intermediate buffers (e.g., (32, 64) -> (2, 16, 64))
+        for proper broadcasting with other tensors in the kernel.
+        """
+        if self._canonical_output_shape is not None:
+            return self._canonical_output_shape
+
+        if not hasattr(self, "range_tree_nodes") or not self.range_tree_nodes:
+            return None
+
+        # Collect iteration variable lengths (same logic as iteration var emission)
+        iter_lengths = set()
+        reduction_lengths = []
+        pointwise_lengths = []
+        for var, entry in self.range_tree_nodes.items():
+            length = self._safe_int(entry.length)
+            if length is not None:
+                iter_lengths.add(length)
+                if entry.is_reduction:
+                    reduction_lengths.append(length)
+                else:
+                    pointwise_lengths.append(length)
+
+        # Helper to check if buffer's numel matches an iteration var
+        def _get_nd_shape_if_matches(buf_name, prefer_no_ones=True):
+            # Use get_buffer which works for both intermediate buffers and graph inputs
+            buf = V.graph.get_buffer(buf_name)
+            if buf is None or len(buf.get_size()) <= 1:
+                return None, None
+            shape = [self._safe_int(s) for s in buf.get_size()]
+            if None in shape:
+                return None, None
+            numel = 1
+            for s in shape:
+                numel *= s
+            if numel not in iter_lengths:
+                return None, None
+            # If prefer_no_ones, skip shapes with 1 dimensions (keepdims artifacts)
+            # This includes interior 1s (e.g., [2, 1, 64]) and trailing 1s (e.g., [2, 16, 1])
+            if prefer_no_ones and 1 in shape:
+                return None, None
+            return (shape, numel)
+
+        # Find reshape target: buffer whose numel matches an iteration var
+        # Check outputs first, then inputs (same order as iteration var emission)
+        # Prefer buffers without interior 1 dimensions (to avoid keepdims artifacts)
+        reshape_target_shape = None
+        reshape_target_numel = None
+
+        # First pass: prefer shapes without interior 1 dimensions
+        for out_name in self.args.output_buffers:
+            shape, numel = _get_nd_shape_if_matches(out_name, prefer_no_ones=True)
+            if shape:
+                reshape_target_shape, reshape_target_numel = shape, numel
+                break
+
+        if reshape_target_shape is None:
+            for in_name in self.args.input_buffers:
+                shape, numel = _get_nd_shape_if_matches(in_name, prefer_no_ones=True)
+                if shape:
+                    reshape_target_shape, reshape_target_numel = shape, numel
+                    break
+
+        # Second pass: accept shapes with interior 1 dimensions as fallback
+        if reshape_target_shape is None:
+            for out_name in self.args.output_buffers:
+                shape, numel = _get_nd_shape_if_matches(out_name, prefer_no_ones=False)
+                if shape:
+                    # Strip interior 1s for the canonical shape
+                    reshape_target_shape = [s for s in shape if s != 1]
+                    if len(reshape_target_shape) < len(shape):
+                        # Recompute numel without 1s
+                        reshape_target_numel = 1
+                        for s in reshape_target_shape:
+                            reshape_target_numel *= s
+                    else:
+                        reshape_target_numel = numel
+                    break
+
+        if reshape_target_shape is None:
+            for in_name in self.args.input_buffers:
+                shape, numel = _get_nd_shape_if_matches(in_name, prefer_no_ones=False)
+                if shape:
+                    # Strip interior 1s for the canonical shape
+                    reshape_target_shape = [s for s in shape if s != 1]
+                    if len(reshape_target_shape) < len(shape):
+                        reshape_target_numel = 1
+                        for s in reshape_target_shape:
+                            reshape_target_numel *= s
+                    else:
+                        reshape_target_numel = numel
+                    break
+
+        if reshape_target_shape is None:
+            return None
+
+        # Build canonical shape: reshape_target + other iteration dims
+        # The reshape target replaces one iteration var, add the rest
+        # NOTE: We should NOT append reduction lengths of 1 (keepdims artifacts)
+        output_shape = list(reshape_target_shape)
+        for length in pointwise_lengths:
+            if length != reshape_target_numel:
+                output_shape.append(length)
+        for length in reduction_lengths:
+            if length != reshape_target_numel and length != 1:
+                # Skip length=1 which is typically from keepdims reduction
+                output_shape.append(length)
+
+        self._canonical_output_shape = output_shape
+        return self._canonical_output_shape
+
+    def _ensure_broadcast_compatible(self, a: str, b: str) -> tuple[str, str]:
+        """
+        Ensure two operands have broadcast-compatible shapes for JAX.
+
+        JAX has stricter broadcasting rules than NumPy/PyTorch. This method
+        checks if the shapes are compatible and reshapes if needed.
+
+        For example:
+        - (32, 64) and (2, 16, 64): reshape (32, 64) -> (2, 16, 64)
+        - (2, 16, 64) and (2, 16, 1, 64): reshape (2, 16, 64) -> (2, 16, 1, 64)
+
+        Returns the (possibly wrapped) operand strings.
+        """
+        shape_a = self.var_shapes.get(str(a))
+        shape_b = self.var_shapes.get(str(b))
+
+        # Try to infer shape from expression if not tracked
+        if shape_a is None:
+            shape_a = self._infer_shape_from_expr(str(a))
+        if shape_b is None:
+            shape_b = self._infer_shape_from_expr(str(b))
+
+        # If we still don't know both shapes, return as-is
+        if shape_a is None or shape_b is None:
+            return a, b
+
+        # If shapes are identical, no action needed
+        if shape_a == shape_b:
+            return a, b
+
+        # Scalars (shape ()) naturally broadcast - don't try to reshape them
+        # jnp.inf/jnp.nan are Python floats and can't be reshaped
+        if len(shape_a) == 0 or len(shape_b) == 0:
+            return a, b
+
+        # Check if shapes already broadcast (same rank and compatible dims)
+        if len(shape_a) == len(shape_b):
+            compatible = True
+            for sa, sb in zip(shape_a, shape_b):
+                if sa != sb and sa != 1 and sb != 1:
+                    compatible = False
+                    break
+            if compatible:
+                return a, b
+
+        # Compute numels
+        numel_a = 1
+        for s in shape_a:
+            numel_a *= s
+        numel_b = 1
+        for s in shape_b:
+            numel_b *= s
+
+        # If numels match, we can reshape one to match the other
+        if numel_a == numel_b:
+            # IMPORTANT: Check for transpose case FIRST!
+            # If shapes are the same dims but reversed, we need transpose, NOT reshape.
+            # reshape() just reinterprets flat data; transpose() actually reorders elements.
+            # E.g., (N, M) -> (M, N) requires transpose, not reshape.
+            if (
+                len(shape_a) == len(shape_b) == 2
+                and sorted(shape_a) == sorted(shape_b)
+                and list(shape_a) == list(reversed(shape_b))
+            ):
+                # shape_a is transpose of shape_b - transpose a to match b
+                new_a = f"jnp.transpose({a})"
+                self.var_shapes[new_a] = shape_b
+                self.has_transposed_load = True
+                return new_a, b
+
+            # First priority: prefer higher dimensionality for safe JAX broadcasting
+            # This ensures intermediate results (e.g., from partial_reduce with keepdims)
+            # maintain their full shape rather than being collapsed
+            if len(shape_a) > len(shape_b):
+                # Reshape b to match a's higher dimensionality
+                shape_str = ", ".join(str(s) for s in shape_a)
+                new_b = f"{b}.reshape({shape_str})"
+                self.var_shapes[new_b] = shape_a
+                return a, new_b
+            elif len(shape_b) > len(shape_a):
+                # Reshape a to match b's higher dimensionality
+                shape_str = ", ".join(str(s) for s in shape_b)
+                new_a = f"{a}.reshape({shape_str})"
+                self.var_shapes[new_a] = shape_b
+                return new_a, b
+
+            # Same dimensionality - use intermediate 1s count as tiebreaker
+            # to avoid keepdims artifacts like (2, 16, 1, 64) vs (2, 16, 64)
+            def count_intermediate_ones(shape):
+                if len(shape) <= 2:
+                    return 0
+                # Count 1s that are not at the start or end
+                middle = shape[1:-1] if len(shape) > 2 else []
+                return sum(1 for s in middle if s == 1)
+
+            ones_a = count_intermediate_ones(shape_a)
+            ones_b = count_intermediate_ones(shape_b)
+
+            if ones_a < ones_b:
+                # Reshape b to match a's shape (a has fewer intermediate 1s)
+                shape_str = ", ".join(str(s) for s in shape_a)
+                new_b = f"{b}.reshape({shape_str})"
+                self.var_shapes[new_b] = shape_a
+                return a, new_b
+            else:
+                # Reshape a to match b's shape (or they're equal, default to b)
+                shape_str = ", ".join(str(s) for s in shape_b)
+                new_a = f"{a}.reshape({shape_str})"
+                self.var_shapes[new_a] = shape_b
+                return new_a, b
+
+        # If one is broadcastable to the other (different numels)
+        # This handles cases like (2, 16, 1) broadcasting with (2, 16, 64)
+        # IMPORTANT: Try LEADING 1s FIRST to match PyTorch/NumPy broadcasting semantics.
+        # PyTorch broadcasting aligns dimensions from the right, so (16,) broadcasting
+        # with (16, 16) should become (1, 16) NOT (16, 1).
+        if len(shape_a) < len(shape_b):
+            n_pad = len(shape_b) - len(shape_a)
+            # Try leading 1s first (standard broadcasting - dimensions align from right)
+            padded_a_leading = (1,) * n_pad + shape_a
+            compatible = all(
+                sa == sb or sa == 1 or sb == 1
+                for sa, sb in zip(padded_a_leading, shape_b)
+            )
+            if compatible:
+                shape_str = ", ".join(str(s) for s in padded_a_leading)
+                new_a = f"{a}.reshape({shape_str})"
+                self.var_shapes[new_a] = padded_a_leading
+                return new_a, b
+
+            # Try trailing 1s (e.g., (2,16,1) -> (2,16,1,1) for (2,16,1,64))
+            padded_a_trailing = shape_a + (1,) * n_pad
+            compatible = all(
+                sa == sb or sa == 1 or sb == 1
+                for sa, sb in zip(padded_a_trailing, shape_b)
+            )
+            if compatible:
+                shape_str = ", ".join(str(s) for s in padded_a_trailing)
+                new_a = f"{a}.reshape({shape_str})"
+                self.var_shapes[new_a] = padded_a_trailing
+                return new_a, b
+
+        elif len(shape_b) < len(shape_a):
+            n_pad = len(shape_a) - len(shape_b)
+            # Try leading 1s first (standard broadcasting - dimensions align from right)
+            # E.g., (16,) with (16, 16) -> (16,) becomes (1, 16) to broadcast along rows
+            padded_b_leading = (1,) * n_pad + shape_b
+            compatible = all(
+                sa == sb or sa == 1 or sb == 1
+                for sa, sb in zip(shape_a, padded_b_leading)
+            )
+            if compatible:
+                shape_str = ", ".join(str(s) for s in padded_b_leading)
+                new_b = f"{b}.reshape({shape_str})"
+                self.var_shapes[new_b] = padded_b_leading
+                return a, new_b
+
+            # Try trailing 1s as fallback
+            padded_b_trailing = shape_b + (1,) * n_pad
+            compatible = all(
+                sa == sb or sa == 1 or sb == 1
+                for sa, sb in zip(shape_a, padded_b_trailing)
+            )
+            if compatible:
+                shape_str = ", ".join(str(s) for s in padded_b_trailing)
+                new_b = f"{b}.reshape({shape_str})"
+                self.var_shapes[new_b] = padded_b_trailing
+                return a, new_b
+
+        # Handle keepdims-style broadcasting: one shape has trailing 1s and
+        # the non-1 product matches a prefix product of the other shape.
+        # Example: (2, 16, 64) and (32, 1) -> reshape (32, 1) to (2, 16, 1)
+        # because 32 = 2 * 16 (prefix product)
+        def try_keepdims_reshape(
+            target_shape: tuple[int, ...], keepdims_shape: tuple[int, ...], operand: str
+        ) -> Optional[tuple[str, tuple[int, ...]]]:
+            """Try to reshape keepdims_shape to match target_shape's prefix."""
+            # Count trailing 1s in keepdims_shape
+            n_trailing_ones = 0
+            for d in reversed(keepdims_shape):
+                if d == 1:
+                    n_trailing_ones += 1
+                else:
+                    break
+            if n_trailing_ones == 0:
+                return None  # No trailing 1s, not a keepdims shape
+
+            # Get the non-1 product
+            non_one_dims = keepdims_shape[: len(keepdims_shape) - n_trailing_ones]
+            keepdims_numel = 1
+            for d in non_one_dims:
+                keepdims_numel *= d
+
+            # Try to match prefix products of target_shape
+            prefix_product = 1
+            for i, d in enumerate(target_shape):
+                prefix_product *= d
+                if prefix_product == keepdims_numel:
+                    # Found matching prefix!
+                    # New shape is target_shape[:i+1] + (1,) * (len(target_shape) - i - 1)
+                    new_shape = target_shape[: i + 1] + (1,) * (len(target_shape) - i - 1)
+                    return operand, new_shape
+            return None
+
+        # Try to reshape shape_b to match shape_a (keepdims case)
+        result = try_keepdims_reshape(shape_a, shape_b, b)
+        if result:
+            operand, new_shape = result
+            shape_str = ", ".join(str(s) for s in new_shape)
+            new_b = f"{operand}.reshape({shape_str})"
+            self.var_shapes[new_b] = new_shape
+            return a, new_b
+
+        # Try to reshape shape_a to match shape_b (keepdims case)
+        result = try_keepdims_reshape(shape_b, shape_a, a)
+        if result:
+            operand, new_shape = result
+            shape_str = ", ".join(str(s) for s in new_shape)
+            new_a = f"{operand}.reshape({shape_str})"
+            self.var_shapes[new_a] = new_shape
+            return new_a, b
+
+        # Fall back to returning as-is
+        return a, b
+
+    def _infer_shape_from_expr(self, expr: str) -> Optional[tuple[int, ...]]:
+        """
+        Try to infer the shape of an expression from its string representation.
+
+        Handles patterns like:
+        - "in_ptr0[...]" -> buffer shape
+        - "in_ptr0[...].reshape(2, 16, 64)" -> (2, 16, 64)
+        - "tmp0.reshape(2, 16, 64)" -> (2, 16, 64)
+        - "tmp3" -> look up in CSE cache to find original expression's shape
+        - "jnp.array(256, dtype=...)" -> () (scalar)
+        - "jnp.asarray(...).astype(...)" -> inherit from inner expression
+        - Integer literals -> () (scalar)
+        """
+        import re
+
+        # Check for reshape pattern
+        match = re.search(r"\.reshape\(([^)]+)\)", expr)
+        if match:
+            try:
+                dims_str = match.group(1)
+                dims = tuple(int(d.strip()) for d in dims_str.split(","))
+                return dims
+            except (ValueError, AttributeError):
+                pass
+
+        # Check for scalar patterns - these all have shape ()
+        # jnp.array(value, dtype=...) with a scalar value
+        if re.match(r"^jnp\.array\([^,\[\]]+,\s*dtype=", expr):
+            return ()
+        # Pure integer literals
+        if re.match(r"^-?\d+$", expr):
+            return ()
+        # Pure float literals
+        if re.match(r"^-?\d+\.?\d*$", expr):
+            return ()
+        # JAX special values
+        if expr in ("jnp.nan", "jnp.inf", "-jnp.inf", "True", "False"):
+            return ()
+
+        # Check for type cast patterns - inherit shape from inner expression
+        # jnp.asarray(x).astype(dtype) -> shape of x
+        match = re.match(r"^jnp\.asarray\(([^)]+)\)\.astype\(", expr)
+        if match:
+            inner_expr = match.group(1)
+            inner_shape = self._infer_shape_from_expr(inner_expr)
+            if inner_shape is not None:
+                return inner_shape
+            # Also check var_shapes directly
+            inner_shape = self.var_shapes.get(inner_expr)
+            if inner_shape is not None:
+                return inner_shape
+
+        # Check for simple CSE variable name like "tmp3"
+        # Look up the original expression in CSE cache and get its shape
+        if re.match(r"^tmp\d+$", expr):
+            # Search CSE cache for the expression that generated this variable
+            for cache_key, cse_var in self.cse._cache.items():
+                if str(cse_var) == expr:
+                    # Found the original expression, check if we have its shape
+                    shape = self.var_shapes.get(cache_key)
+                    if shape is not None:
+                        # Also cache this for future lookups
+                        self.var_shapes[expr] = shape
+                        return shape
+                    # Shape not directly tracked, try to infer from the expression
+                    inferred = self._infer_shape_from_expr(cache_key)
+                    if inferred is not None:
+                        self.var_shapes[expr] = inferred
+                        return inferred
+                    break
+
+        # Check for indexed access pattern like "in_ptr0[...].flatten()[idx]"
+        # These have shape determined by the index expression broadcast, which is
+        # complex to infer. Return None to avoid incorrect reshapes.
+        if ".flatten()[" in expr:
+            return None
+
+        # Check for buffer access pattern like "in_ptr0[...]"
+        match = re.match(r"(in_ptr\d+|buf\d+)\[", expr)
+        if match:
+            buf_name = match.group(1)
+            # Look up in args to get actual buffer name
+            for actual_name, arg_name in self.args.input_buffers.items():
+                if arg_name == buf_name:
+                    buf_obj = V.graph.try_get_buffer(actual_name)
+                    if buf_obj is not None:
+                        buf_size = buf_obj.get_size()
+                        shape = tuple(self._safe_int(s) for s in buf_size)
+                        if None not in shape:
+                            return shape
+                    break
+
+        # Don't use canonical shape as fallback - it doesn't account for
+        # intermediate shapes like keepdims reductions. Return None and
+        # let the caller handle unknown shapes.
+        return None
+
+    def _track_binary_op_shape(
+        self, result_expr: str, a: str, b: str
+    ) -> None:
+        """
+        Track the shape of a binary operation result.
+
+        The result shape is the broadcast of the two operand shapes.
+        """
+        shape_a = self.var_shapes.get(str(a))
+        shape_b = self.var_shapes.get(str(b))
+
+        if shape_a is None:
+            shape_a = self._infer_shape_from_expr(str(a))
+        if shape_b is None:
+            shape_b = self._infer_shape_from_expr(str(b))
+
+        if shape_a is None or shape_b is None:
+            return
+
+        # Compute broadcast shape
+        result_shape = self._compute_broadcast_shape(shape_a, shape_b)
+        if result_shape is not None:
+            self.var_shapes[result_expr] = result_shape
+
+    def _compute_broadcast_shape(
+        self, shape_a: tuple[int, ...], shape_b: tuple[int, ...]
+    ) -> Optional[tuple[int, ...]]:
+        """
+        Compute the broadcast shape of two shapes.
+
+        Returns None if shapes are not broadcast-compatible.
+        """
+        # Pad shorter shape with leading 1s
+        max_len = max(len(shape_a), len(shape_b))
+        padded_a = (1,) * (max_len - len(shape_a)) + shape_a
+        padded_b = (1,) * (max_len - len(shape_b)) + shape_b
+
+        result = []
+        for sa, sb in zip(padded_a, padded_b):
+            if sa == sb:
+                result.append(sa)
+            elif sa == 1:
+                result.append(sb)
+            elif sb == 1:
+                result.append(sa)
+            else:
+                # Incompatible - shapes don't broadcast
+                return None
+
+        return tuple(result)
+
+    def _track_unary_op_shape(self, result_expr: str, x: str) -> None:
+        """Track the shape of a unary operation result (same as input)."""
+        shape = self.var_shapes.get(str(x))
+        if shape is None:
+            shape = self._infer_shape_from_expr(str(x))
+        if shape is not None:
+            self.var_shapes[result_expr] = shape
+
+    def _compute_indexed_load_shape(
+        self, index: sympy.Expr
+    ) -> Optional[tuple[int, ...]]:
+        """
+        Compute the shape of an indexed load from the index expression broadcast.
+
+        For indexed loads like `buf[...].flatten()[x0 + 2*x1]`, the result shape
+        is determined by broadcasting the shapes of x0 and x1 (as reshaped arrays).
+
+        The iteration variables are reshaped for broadcasting:
+        - Variables with larger coefficients become earlier dimensions
+        - Each variable contributes its length to one dimension
+        - Singleton dimensions (1) are inserted for other positions
+
+        Example: index = x0 + 2*x1 with x0.length=2, x1.length=6
+        - x1 has larger coeff (2), so it's earlier: reshape to (6, 1)
+        - x0 has smaller coeff (1), so it's later: reshape to (1, 2)
+        - Broadcast result: (6, 2)
+
+        For embedding lookups with indirect variables like `buf[...].flatten()[x0 + 64*tmp0]`:
+        - tmp0 (indirect var) has shape from indices tensor, e.g., (2, 16)
+        - x0 (iter var) has length 64
+        - The result broadcasts to (2, 16, 64)
+        """
+        # Check for indirect variables - they contribute their shape to the result
+        indirect_vars = self._get_indirect_vars(index)
+        indirect_shape: list[int] = []
+        has_indirect = bool(indirect_vars)
+        if indirect_vars:
+            # Get shape of first indirect variable (they should all have same shape)
+            for indirect_var in indirect_vars:
+                indirect_var_shape = self.var_shapes.get(str(indirect_var))
+                if indirect_var_shape and len(indirect_var_shape) > 0:
+                    indirect_shape = list(indirect_var_shape)
+                    break
+
+        used_vars = self._get_used_iter_vars(index)
+        if not used_vars and not indirect_shape:
+            # If we have indirect variables but couldn't find their shape,
+            # fall back to canonical output shape (which captures all dimensions)
+            if has_indirect:
+                canonical = self._get_canonical_output_shape()
+                if canonical is not None:
+                    return tuple(canonical)
+            return None
+
+        # Get iteration variable lengths and sort by coefficient (descending)
+        # Higher coefficient = earlier dimension in the output
+        var_info = []
+        for var in used_vars:
+            if var in self.range_tree_nodes:
+                entry = self.range_tree_nodes[var]
+                if entry.is_reduction:
+                    continue  # Skip reduction variables
+                length = self._safe_int(entry.length)
+                if length is None:
+                    return None  # Dynamic shape, can't compute
+                # Get coefficient of this var in the index
+                coeff = index.coeff(var)
+                if coeff == 0:
+                    coeff = sympy.diff(index, var)
+                try:
+                    coeff_val = int(coeff) if coeff.is_number else 0
+                except (TypeError, AttributeError):
+                    coeff_val = 0
+                var_info.append((var, length, coeff_val))
+
+        # Sort by coefficient descending (larger coeff = earlier dimension)
+        var_info.sort(key=lambda x: x[2], reverse=True)
+
+        # The broadcast shape combines indirect var shape with iteration var lengths
+        # Indirect var shape comes first (leading dimensions from indices tensor)
+        # Iteration var lengths come after (e.g., embedding dimension)
+        iter_shape = tuple(length for _, length, _ in var_info)
+
+        if indirect_shape:
+            # Combine: indirect shape (e.g., batch, seq) + iter shape (e.g., embed_dim)
+            shape = tuple(indirect_shape) + iter_shape
+        elif has_indirect:
+            # Have indirect vars but couldn't find their shape
+            # Fall back to canonical output shape (which captures all dimensions)
+            canonical = self._get_canonical_output_shape()
+            if canonical is not None:
+                return tuple(canonical)
+            # If no canonical shape, just use iteration variables
+            if var_info:
+                shape = iter_shape
+            else:
+                return None
+        elif var_info:
+            shape = iter_shape
+        else:
+            return None
+
+        return shape
+
+    def _track_var_shape(
+        self, var_name: str, buf_name: str, load_expr: str, index: sympy.Expr
+    ) -> None:
+        """
+        Track the shape of a loaded variable for on-demand reshape at binary ops.
+
+        This determines the effective shape for the variable. For indirect indexing
+        (embedding lookups), the effective shape is based on the indices shape, not
+        the buffer shape.
+        """
+        buf_obj = V.graph.try_get_buffer(buf_name)
+        if buf_obj is None:
+            return
+
+        # Check for trailing .reshape() first - this takes priority over index-based
+        # shape inference since it's the final shape of the expression.
+        # This handles cases like: buf[...].flatten()[idx].reshape(20, 1048576)
+        if ".reshape(" in load_expr:
+            import re
+
+            match = re.search(r"\.reshape\(([^)]+)\)$", load_expr)
+            if match:
+                try:
+                    dims_str = match.group(1)
+                    dims = tuple(int(d.strip()) for d in dims_str.split(","))
+                    self.var_shapes[var_name] = dims
+                    return
+                except (ValueError, AttributeError):
+                    pass
+
+        # For indexed loads without trailing reshape, compute shape from index broadcast
+        # The shape is determined by the broadcast of all iteration variable shapes
+        if ".flatten()[" in load_expr:
+            shape = self._compute_indexed_load_shape(index)
+            if shape is not None:
+                self.var_shapes[var_name] = shape
+            return
+
+        # Get original buffer shape
+        buf_size = buf_obj.get_size()
+        buf_shape = tuple(self._safe_int(s) for s in buf_size)
+        if None in buf_shape:
+            return
+
+        shape = buf_shape
+
+        # Check if load_expr includes a reshape - extract the target shape
+        if ".reshape(" in load_expr:
+            # Extract reshape dimensions from the expression
+            # e.g., "in_ptr0[...].reshape(2, 16, 64)" -> (2, 16, 64)
+            import re
+
+            match = re.search(r"\.reshape\(([^)]+)\)", load_expr)
+            if match:
+                try:
+                    dims_str = match.group(1)
+                    dims = tuple(int(d.strip()) for d in dims_str.split(","))
+                    shape = dims
+                except (ValueError, AttributeError):
+                    pass
+        elif "jnp.transpose(" in load_expr:
+            # Check if load_expr includes a transpose - permute the shape
+            # e.g., "jnp.transpose(in_ptr0[...], axes=(1, 0,))" -> permute (8, 16) to (16, 8)
+            import re
+
+            match = re.search(
+                r"jnp\.transpose\([^,]+,\s*axes=\(([^)]+)\)", load_expr
+            )
+            if match:
+                try:
+                    axes_str = match.group(1)
+                    axes = tuple(
+                        int(a.strip().rstrip(","))
+                        for a in axes_str.split(",")
+                        if a.strip().rstrip(",")
+                    )
+                    # Permute the shape: axes[i] = which original dim goes to output dim i
+                    shape = tuple(buf_shape[a] for a in axes)
+                except (ValueError, IndexError):
+                    pass
+        else:
+            # Check if this is an indirect load (embedding lookup)
+            # For indirect indexing, the effective shape is the canonical output shape
+            has_indirect = self._has_indirect_vars(index)
+            if has_indirect:
+                # For indirect indexing (e.g., embedding), use canonical output shape
+                canonical = self._get_canonical_output_shape()
+                if canonical is not None:
+                    shape = tuple(canonical)
+            else:
+                # For direct indexing, check if buffer shape needs to match canonical
+                # BUT preserve buffer shapes with singleton dimensions (e.g., (1, 10))
+                # as these are meaningful for broadcasting.
+                # ALSO preserve higher-dimensional buffer shapes (e.g., (65, 2, 2, 2) vs (65, 8))
+                # as these are needed for correct broadcasting with keepdims-style reductions.
+                canonical = self._get_canonical_output_shape()
+                if canonical is not None and list(canonical) != list(buf_shape):
+                    # Don't replace buffer shape if it has singleton dimensions
+                    # These indicate explicit broadcast structure (e.g., (1, 10) for row broadcast)
+                    has_singletons = 1 in buf_shape
+                    # Don't replace buffer shape if it has more dimensions than canonical
+                    # Higher-dimensional shapes are needed for keepdims-style broadcasting
+                    # e.g., (65, 2, 2, 2) should not become (65, 8)
+                    has_more_dims = len(buf_shape) > len(canonical)
+                    if not has_singletons and not has_more_dims:
+                        buf_numel = 1
+                        for s in buf_shape:
+                            buf_numel *= s
+                        canonical_numel = 1
+                        for s in canonical:
+                            canonical_numel *= s
+                        # If numels match, track canonical shape as the effective shape
+                        if buf_numel == canonical_numel:
+                            shape = tuple(canonical)
+
+        self.var_shapes[var_name] = shape
 
     def check_bounds(
         self, expr: sympy.Expr, size: sympy.Expr, lower: bool, upper: bool
@@ -1119,56 +1929,84 @@ class PallasKernel(SIMDKernel):
         # So output shape is [second_var_length, first_var_length, ...]
         return list(reversed(broadcast_vars))
 
-    def _is_transposed_access(self, name: str, index: sympy.Expr) -> bool:
-        """Check if buffer access needs transpose.
+    def _get_transpose_axes(
+        self, name: str, index: sympy.Expr
+    ) -> Optional[tuple[int, ...]]:
+        """
+        Compute transpose axes needed for N-D buffer access.
 
-        Transpose on load is needed when:
-        1. Non-square buffers: dimensions are swapped relative to iteration vars
-        2. Square buffers: index coefficient pattern indicates transposed access
-           (first iteration var has larger coefficient than second)
+        Returns the axes permutation if transpose is needed, None otherwise.
+        For a transpose from input layout to output layout, we need to determine
+        which input dimension corresponds to which output dimension based on
+        the coefficient pattern in the index expression.
+
+        The key insight: we match each iteration variable to an input dimension by:
+        1. Matching the coefficient in the index expr to the buffer stride
+        2. Verifying the variable's length equals the buffer size at that dimension
+
+        If both conditions match for all variables and result in a non-identity
+        permutation, we have a transpose.
         """
         buf_obj = V.graph.get_buffer(name)
         if buf_obj is None:
-            return False
+            return None
 
         buf_size = buf_obj.get_size()
+        ndim = len(buf_size)
 
-        # Only handle 2D buffers
-        if len(buf_size) != 2:
-            return False
+        # Need at least 2D for transpose
+        if ndim < 2:
+            return None
 
         layout = getattr(buf_obj, "get_layout", lambda: None)()
         if layout is None:
-            return False
+            return None
 
         buf_stride = getattr(layout, "stride", None)
-        if buf_stride is None or len(buf_stride) != 2:
-            return False
-
-        size0 = self._safe_int(buf_size[0])
-        size1 = self._safe_int(buf_size[1])
-        if size0 is None or size1 is None or size0 <= 1 or size1 <= 1:
-            return False
-
-        # Get buffer strides
-        s0 = self._safe_int(buf_stride[0])
-        s1 = self._safe_int(buf_stride[1])
-        if s0 is None or s1 is None:
-            return False
+        if buf_stride is None or len(buf_stride) != ndim:
+            return None
 
         # Get iteration variable info
         var_items = list(self.range_tree_nodes.items())
-        if len(var_items) < 2:
-            return False
+        if len(var_items) != ndim:
+            return None
 
         # Skip for reduction variables
-
         if any(entry.is_reduction for _, entry in var_items):
-            return False
+            return None
 
-        # Extract coefficients from index expression
-        inner_var = var_items[0][0]
-        outer_var = var_items[1][0]
+        # Get buffer strides and sizes as integers
+        buf_strides = [self._safe_int(s) for s in buf_stride]
+        buf_sizes = [self._safe_int(s) for s in buf_size]
+        if None in buf_strides or None in buf_sizes:
+            return None
+
+        # Skip if any dimension has size <= 1 (no meaningful transpose)
+        if any(s <= 1 for s in buf_sizes):
+            return None
+
+        # Check if buffer strides form a valid transpose pattern.
+        # A true transpose has strides that are a permutation of contiguous strides.
+        # Non-contiguous slices (e.g., aliased buffers) have strides that don't fit this pattern.
+        # For shape (A, B), contiguous strides are (B, 1).
+        # A transposed (A, B) from (B, A).T has strides (1, A).
+        # Non-contiguous slice might have strides like (C, 1) where C > B.
+        expected_contiguous_strides = []
+        stride = 1
+        for i in range(ndim - 1, -1, -1):
+            expected_contiguous_strides.insert(0, stride)
+            stride *= buf_sizes[i]
+
+        # Check if strides are a permutation of contiguous strides
+        if sorted(buf_strides) != sorted(expected_contiguous_strides):
+            # Strides don't form a valid transpose pattern - likely a non-contiguous slice
+            return None
+
+        # Get iteration variable lengths
+        var_lengths = [self._safe_int(entry.length) for _, entry in var_items]
+        if None in var_lengths:
+            return None
+
         index = V.graph.sizevars.simplify(index)
 
         def get_coefficient(expr, var):
@@ -1192,26 +2030,527 @@ class PallasKernel(SIMDKernel):
                     return coeff
             return None
 
-        inner_coeff = get_coefficient(index, inner_var)
-        outer_coeff = get_coefficient(index, outer_var)
+        # Extract coefficients for each iteration variable
+        coefficients = []
+        for var, _entry in var_items:
+            coeff = get_coefficient(index, var)
+            if coeff is None:
+                return None
+            coefficients.append(coeff)
 
-        if inner_coeff is not None and outer_coeff is not None:
-            # Only transpose for standard row-major buffers (stride[0] = size[1], stride[1] = 1)
-            is_standard_row_major = s0 == size1 and s1 == 1
-            if not is_standard_row_major:
+        # Build output_to_input mapping: for each output dim, which input dim does it read from
+        # We require BOTH coefficient match (stride) AND length match (size) for validity
+        output_to_input = []
+        used_input_dims = set()
+
+        for out_dim, (coeff, var_len) in enumerate(zip(coefficients, var_lengths)):
+            # Find the input dimension whose stride matches this coefficient
+            # AND whose size matches the variable length
+            best_input_dim = None
+            for in_dim, (stride, size) in enumerate(zip(buf_strides, buf_sizes)):
+                if in_dim not in used_input_dims and stride == coeff and size == var_len:
+                    best_input_dim = in_dim
+                    break
+
+            if best_input_dim is None:
+                return None
+
+            output_to_input.append(best_input_dim)
+            used_input_dims.add(best_input_dim)
+
+        # Check if we have a valid permutation
+        if len(set(output_to_input)) != ndim:
+            return None
+
+        # Determine if iteration variables are in reversed order compared to output dimensions.
+        # When var_lengths matches buf_sizes exactly, variables are in buffer dimension order.
+        # When var_lengths is reversed from output shape, variables are innermost-to-outermost.
+        #
+        # For contiguous access (no transpose): var_lengths == buf_sizes in order, so
+        #   output_to_input will be identity [0, 1, ...] - return None
+        # For transpose: var_lengths are in reversed output order, so we need to
+        #   reverse output_to_input to get actual axes.
+        #
+        # Check if output_to_input is identity (no transpose needed)
+        identity_perm = list(range(ndim))
+        if output_to_input == identity_perm:
+            return None
+
+        # Non-identity permutation means we need a transpose.
+        # Determine actual axes based on var_lengths ordering.
+        reversed_output = list(reversed(output_to_input))
+
+        # Determine the correct axes for the transpose.
+        # If var_lengths are in reversed order compared to a typical output shape,
+        # we need to use reversed_output. Otherwise, use output_to_input directly.
+        #
+        # Check if var_lengths appears to be reversed (larger dims first for typical N-D arrays
+        # where inner dims are usually smaller in memory-contiguous layouts)
+        # For example, [16, 16, 4, 2] suggests reversed from [2, 4, 16, 16]
+
+        # Use reversed axes if var_lengths looks like it's in innermost-first order
+        # This is a heuristic: if the first var length is smaller or equal to the last
+        # for the input buffer, we're likely in normal order; otherwise reversed
+        if var_lengths[0] <= var_lengths[-1]:
+            # Variables likely in normal order (outermost to innermost)
+            actual_axes = output_to_input
+        else:
+            # Variables likely in reversed order (innermost to outermost)
+            actual_axes = reversed_output
+
+        # Check if actual_axes is identity (no transpose needed)
+        # We checked output_to_input above, but actual_axes could be reversed_output
+        # which might be identity even if output_to_input is not
+        if list(actual_axes) == identity_perm:
+            return None
+
+        # The axes for jnp.transpose: axes[i] = which input dim goes to output dim i
+        return tuple(actual_axes)
+
+    def _is_transposed_access(self, name: str, index: sympy.Expr) -> bool:
+        """Check if buffer access needs transpose (backward compatible wrapper)."""
+        return self._get_transpose_axes(name, index) is not None
+
+    def _get_noncontiguous_transpose_axes(self, name: str) -> Optional[tuple[int, ...]]:
+        """
+        Compute transpose axes needed for non-contiguous buffer inputs.
+
+        When a non-contiguous tensor (e.g., from a transpose view) is passed to
+        the kernel, JAX receives the data in its physical memory layout, not the
+        logical shape. We need to apply a transpose to reorder the data correctly.
+
+        Returns the axes permutation if the buffer is non-contiguous, None otherwise.
+        """
+        buf_obj = V.graph.get_buffer(name)
+        if buf_obj is None:
+            return None
+
+        buf_size = buf_obj.get_size()
+        ndim = len(buf_size)
+
+        # Need at least 2D for transpose
+        if ndim < 2:
+            return None
+
+        layout = getattr(buf_obj, "get_layout", lambda: None)()
+        if layout is None:
+            return None
+
+        buf_stride = getattr(layout, "stride", None)
+        if buf_stride is None or len(buf_stride) != ndim:
+            return None
+
+        # Get buffer strides and sizes as integers
+        buf_strides = [self._safe_int(s) for s in buf_stride]
+        buf_sizes = [self._safe_int(s) for s in buf_size]
+        if None in buf_strides or None in buf_sizes:
+            return None
+
+        # Skip if any dimension has size <= 1 (no meaningful transpose)
+        if any(s <= 1 for s in buf_sizes):
+            return None
+
+        # Compute expected contiguous strides (row-major)
+        expected_strides = []
+        stride = 1
+        for i in range(ndim - 1, -1, -1):
+            expected_strides.insert(0, stride)
+            stride *= buf_sizes[i]
+
+        # Check if buffer is already contiguous
+        if buf_strides == expected_strides:
+            return None
+
+        # Buffer is non-contiguous. Compute the permutation needed.
+        # The physical layout is determined by strides: larger stride = outer dimension.
+        # We need to find the permutation that maps physical order to logical order.
+
+        # Create list of (stride, dim_index) and sort by stride descending
+        # This gives us the physical dimension order (outermost to innermost)
+        stride_dim_pairs = [(buf_strides[i], i) for i in range(ndim)]
+        stride_dim_pairs.sort(key=lambda x: -x[0])  # Sort by stride, largest first
+
+        # Build the inverse permutation: phys_to_logical[phys_dim] = logical_dim
+        phys_to_logical = [dim for _, dim in stride_dim_pairs]
+
+        # Check if this is just identity (already in correct order)
+        if phys_to_logical == list(range(ndim)):
+            return None
+
+        # We need the inverse: for each logical dim, which physical dim provides it
+        # axes[logical_dim] = physical_dim means: output dim logical_dim comes from
+        # input (physical) dim physical_dim
+        logical_to_phys = [0] * ndim
+        for phys_dim, logical_dim in enumerate(phys_to_logical):
+            logical_to_phys[logical_dim] = phys_dim
+
+        return tuple(logical_to_phys)
+
+    def _get_permute_axes_for_store(self) -> Optional[tuple[int, ...]]:
+        """
+        Compute permutation axes needed when input and output shapes differ.
+
+        When a kernel has a permute/transpose operation, the input shape differs
+        from the output shape. For example:
+        - Input shape: (2, 16, 4, 16)
+        - Output shape: (2, 16, 16, 4)
+        - Permutation: [0, 1, 3, 2] (swap dims 2 and 3)
+
+        This function detects such cases and returns the permutation axes.
+        Returns None if no permutation is needed (shapes match or can't determine).
+        """
+        # Get the first input buffer shape
+        input_shape = None
+        for buf_name in self.args.input_buffers:
+            buf_obj = V.graph.get_buffer(buf_name)
+            if buf_obj is not None:
+                input_shape = [self._safe_int(s) for s in buf_obj.get_size()]
+                if None not in input_shape:
+                    break
+                input_shape = None
+
+        if input_shape is None:
+            return None
+
+        # Get the first output buffer shape
+        output_shape = None
+        output_buffers = getattr(self.args, "output_buffers", {})
+        for buf_name in output_buffers:
+            buf_obj = V.graph.get_buffer(buf_name)
+            if buf_obj is not None:
+                output_shape = [self._safe_int(s) for s in buf_obj.get_size()]
+                if None not in output_shape:
+                    break
+                output_shape = None
+
+        if output_shape is None:
+            return None
+
+        # If shapes are the same, check if strides indicate a transpose is needed
+        # This handles square matrices where shapes are equal but strides differ
+        # (e.g., input strides [8, 1] vs output strides [1, 8])
+        # BUT: for "copy" kernels where output strides are just a different layout
+        # (not a true transpose/reverse), don't apply permutation - the .copy_()
+        # in the main function will handle the layout conversion correctly.
+        if input_shape == output_shape:
+            # Get both input and output strides to determine if this is a true transpose
+            input_strides = None
+            output_strides = None
+            for buf_name in self.args.input_buffers:
+                buf_obj = V.graph.get_buffer(buf_name)
+                if buf_obj is not None:
+                    layout = getattr(buf_obj, "get_layout", lambda: None)()
+                    if layout is not None:
+                        stride = getattr(layout, "stride", None)
+                        if stride is not None:
+                            input_strides = [self._safe_int(s) for s in stride]
+                            if None in input_strides:
+                                input_strides = None
+                            break
+            output_buffers = getattr(self.args, "output_buffers", {})
+            for buf_name in output_buffers:
+                buf_obj = V.graph.get_buffer(buf_name)
+                if buf_obj is not None:
+                    layout = getattr(buf_obj, "get_layout", lambda: None)()
+                    if layout is not None:
+                        stride = getattr(layout, "stride", None)
+                        if stride is not None:
+                            output_strides = [self._safe_int(s) for s in stride]
+                            if None in output_strides:
+                                output_strides = None
+                            break
+
+            if input_strides is not None and output_strides is not None:
+                # Check if output strides are the REVERSE of input strides
+                # This indicates a true transpose (like x.T on square matrix)
+                if output_strides == input_strides[::-1]:
+                    # True transpose: apply permutation
+                    return self._compute_permute_from_strides()
+                # Otherwise, this is just a layout change (copy kernel)
+                # Don't apply permutation - .copy_() handles layout conversion
+                return None
+            return self._compute_permute_from_strides()
+
+        # If different number of dimensions, can't be a simple permutation
+        if len(input_shape) != len(output_shape):
+            return None
+
+        # Check if output_shape is a permutation of input_shape
+        if sorted(input_shape) != sorted(output_shape):
+            return None  # Not a permutation (different elements)
+
+        # IMPORTANT: If both input and output are contiguous (row-major strides),
+        # this is a VIEW/reshape operation, NOT a transpose. A view just reinterprets
+        # the same flat data with a different shape - no data reordering needed.
+        # For a true transpose, the output would have non-contiguous strides.
+        def is_contiguous_for_shape(shape, strides):
+            """Check if strides are standard row-major for the given shape."""
+            if strides is None or shape is None:
                 return False
+            expected_stride = 1
+            for dim_size, actual_stride in reversed(list(zip(shape, strides))):
+                if actual_stride != expected_stride:
+                    return False
+                expected_stride *= dim_size
+            return True
 
-            # Only transpose if output is column-major (indicates actual transpose op)
-            output_is_column_major = self._has_column_major_output()
-            if not output_is_column_major:
-                return False
+        # Get output strides
+        output_strides = None
+        output_buffers = getattr(self.args, "output_buffers", {})
+        for buf_name in output_buffers:
+            buf_obj = V.graph.get_buffer(buf_name)
+            if buf_obj is not None:
+                layout = getattr(buf_obj, "get_layout", lambda: None)()
+                if layout is not None:
+                    stride = getattr(layout, "stride", None)
+                    if stride is not None:
+                        output_strides = [self._safe_int(s) for s in stride]
+                        if None in output_strides:
+                            output_strides = None
+                        break
 
-            # Check if coefficients indicate transposed access
-            inner_matches_s0 = abs(inner_coeff - s0) < abs(inner_coeff - s1)
-            outer_matches_s1 = abs(outer_coeff - s1) < abs(outer_coeff - s0)
-            return inner_matches_s0 and outer_matches_s1
+        # If output has contiguous strides for its shape, this is a view/reshape
+        if is_contiguous_for_shape(output_shape, output_strides):
+            return None  # No transpose needed - it's a view operation
 
-        return False
+        # Find the permutation: for each output dim, which input dim has the same size
+        # This only works reliably when all dimensions have unique sizes
+        if len(set(input_shape)) != len(input_shape):
+            # Multiple dims have same size - need to use stride info instead
+            # Try to use stride patterns to determine the permutation
+            return self._compute_permute_from_strides()
+
+        # All dims unique - can determine permutation from shapes
+        axes = []
+        used = set()
+        for out_size in output_shape:
+            for i, in_size in enumerate(input_shape):
+                if in_size == out_size and i not in used:
+                    axes.append(i)
+                    used.add(i)
+                    break
+
+        if len(axes) != len(output_shape):
+            return None
+
+        # Check if it's identity (no permutation needed)
+        if axes == list(range(len(axes))):
+            return None
+
+        return tuple(axes)
+
+    def _get_permute_info_for_store(
+        self,
+    ) -> Optional[tuple[tuple[int, ...], tuple[int, ...], tuple[int, ...]]]:
+        """
+        Get permutation info for store when input/output shapes differ by permutation.
+
+        Returns (input_shape, output_shape, permute_axes) or None if no permutation needed.
+        This is used for the scatter store path where we need to reshape and transpose.
+        """
+        # Get the first input buffer shape
+        input_shape = None
+        for buf_name in self.args.input_buffers:
+            buf_obj = V.graph.get_buffer(buf_name)
+            if buf_obj is not None:
+                shape = [self._safe_int(s) for s in buf_obj.get_size()]
+                if None not in shape:
+                    input_shape = tuple(shape)
+                    break
+
+        if input_shape is None:
+            return None
+
+        # Get the first output buffer shape
+        output_shape = None
+        output_buffers = getattr(self.args, "output_buffers", {})
+        for buf_name in output_buffers:
+            buf_obj = V.graph.get_buffer(buf_name)
+            if buf_obj is not None:
+                shape = [self._safe_int(s) for s in buf_obj.get_size()]
+                if None not in shape:
+                    output_shape = tuple(shape)
+                    break
+
+        if output_shape is None:
+            return None
+
+        # Check if they have same number of elements
+        input_numel = 1
+        for s in input_shape:
+            input_numel *= s
+        output_numel = 1
+        for s in output_shape:
+            output_numel *= s
+
+        if input_numel != output_numel:
+            return None
+
+        # If shapes are the same, no permutation needed
+        if input_shape == output_shape:
+            return None
+
+        # For different number of dims, need to find intermediate shape
+        # Common case: input (2, 16, 4, 8, 2) -> output (2, 4, 16, 16)
+        # Intermediate: (2, 16, 4, 16) with permute [0, 2, 1, 3]
+        if len(input_shape) != len(output_shape):
+            # Try to find intermediate shape by matching dimensions
+            # The intermediate shape should have same ndim as output
+            # and same numel as input
+            intermediate = self._find_intermediate_shape_for_permute(
+                input_shape, output_shape
+            )
+            if intermediate is None:
+                return None
+            input_shape = intermediate
+
+        # Now input_shape and output_shape have same ndim
+        # Check if output_shape is a permutation of input_shape
+        if sorted(input_shape) != sorted(output_shape):
+            return None
+
+        # Find the permutation axes
+        # For each output position, find which input position it comes from
+        axes = []
+        used = set()
+
+        # First, handle dims with unique sizes - these can be matched unambiguously
+        unique_input_sizes = {}
+        for i, s in enumerate(input_shape):
+            if input_shape.count(s) == 1:
+                unique_input_sizes[s] = i
+
+        for out_idx, out_size in enumerate(output_shape):
+            if out_size in unique_input_sizes:
+                # This size is unique in input, so we know the mapping
+                in_idx = unique_input_sizes[out_size]
+                if in_idx not in used:
+                    axes.append(in_idx)
+                    used.add(in_idx)
+                    continue
+
+            # For non-unique sizes, prefer matching same position first (identity)
+            # Then try nearby positions
+            matched = False
+            # Prefer identity mapping (same position)
+            if out_idx < len(input_shape) and input_shape[out_idx] == out_size and out_idx not in used:
+                axes.append(out_idx)
+                used.add(out_idx)
+                matched = True
+            else:
+                # Try other positions with same size
+                for in_idx, in_size in enumerate(input_shape):
+                    if in_size == out_size and in_idx not in used:
+                        axes.append(in_idx)
+                        used.add(in_idx)
+                        matched = True
+                        break
+
+            if not matched:
+                return None
+
+        if len(axes) != len(output_shape):
+            return None
+
+        # Check if it's identity (no permutation needed)
+        if axes == list(range(len(axes))):
+            return None
+
+        return (input_shape, output_shape, tuple(axes))
+
+    def _find_intermediate_shape_for_permute(
+        self, input_shape: tuple[int, ...], output_shape: tuple[int, ...]
+    ) -> Optional[tuple[int, ...]]:
+        """
+        Find intermediate shape when input and output have different ndim.
+
+        For example:
+        - Input (2, 16, 4, 8, 2) -> Output (2, 4, 16, 16)
+        - Intermediate should be (2, 16, 4, 16) which is a view of input
+          and can be permuted to output
+        """
+        # Common case: input has more dims, need to merge some dims
+        # The merged dims typically come from view_as_real -> view pattern
+
+        # Try to find which input dims to merge
+        # Start from the end (common pattern: last N dims merge)
+        for merge_start in range(len(input_shape) - 1, 0, -1):
+            # Merge dims from merge_start to end
+            merged_size = 1
+            for i in range(merge_start, len(input_shape)):
+                merged_size *= input_shape[i]
+
+            # Build intermediate shape
+            intermediate = list(input_shape[:merge_start]) + [merged_size]
+
+            # Check if this matches output ndim and sorted values
+            if len(intermediate) == len(output_shape):
+                if sorted(intermediate) == sorted(output_shape):
+                    return tuple(intermediate)
+
+        return None
+
+    def _compute_permute_from_strides(self) -> Optional[tuple[int, ...]]:
+        """
+        Compute permutation from stride patterns when sizes are not unique.
+        """
+        # Get input buffer stride info
+        input_strides = None
+        for buf_name in self.args.input_buffers:
+            buf_obj = V.graph.get_buffer(buf_name)
+            if buf_obj is not None:
+                layout = getattr(buf_obj, "get_layout", lambda: None)()
+                if layout is not None:
+                    stride = getattr(layout, "stride", None)
+                    if stride is not None:
+                        input_strides = [self._safe_int(s) for s in stride]
+                        if None not in input_strides:
+                            break
+                        input_strides = None
+
+        # Get output buffer stride info
+        output_strides = None
+        output_buffers = getattr(self.args, "output_buffers", {})
+        for buf_name in output_buffers:
+            buf_obj = V.graph.get_buffer(buf_name)
+            if buf_obj is not None:
+                layout = getattr(buf_obj, "get_layout", lambda: None)()
+                if layout is not None:
+                    stride = getattr(layout, "stride", None)
+                    if stride is not None:
+                        output_strides = [self._safe_int(s) for s in stride]
+                        if None not in output_strides:
+                            break
+                        output_strides = None
+
+        if input_strides is None or output_strides is None:
+            return None
+
+        if len(input_strides) != len(output_strides):
+            return None
+
+        # Match strides: for each output stride, find matching input stride
+        axes = []
+        used = set()
+        for out_stride in output_strides:
+            found = False
+            for i, in_stride in enumerate(input_strides):
+                if in_stride == out_stride and i not in used:
+                    axes.append(i)
+                    used.add(i)
+                    found = True
+                    break
+            if not found:
+                return None
+
+        if len(axes) != len(output_strides):
+            return None
+
+        # Check if it's identity
+        if axes == list(range(len(axes))):
+            return None
+
+        return tuple(axes)
 
     def _has_column_major_output(self) -> bool:
         """Check if any output buffer has column-major stride layout."""
@@ -1271,100 +2610,6 @@ class PallasKernel(SIMDKernel):
                     needs_flatten = True
             return index_str, needs_flatten
 
-    def _determine_masked_ops_for_kernel(self) -> bool:
-        """
-        Determine if we should use masked ops for this entire kernel.
-
-        Masked ops with pl.ds(block_size) flatten tensors to 1D, which works when:
-        1. We're on GPU (CUDA backend uses Mosaic which requires power-of-2 sizes)
-        2. All tensors are already 1D (so flattening doesn't change dimensionality)
-        3. All tensors have the same size (so broadcasting works correctly)
-
-        With per-tensor masks, each tensor gets its own mask based on its size.
-
-        This should be called once in codegen_kernel() before generating the kernel body.
-        """
-        # Mosaic GPU backend doesn't support jnp.arange inside kernels,
-        # so we can't use masked ops which require creating mask arrays.
-        # CPU doesn't need masked ops either.
-        # TODO: Re-enable masked ops when Mosaic supports the required operations
-        return False
-
-        # Get all buffer sizes
-        # We need ALL buffers - inputs, outputs, and intermediates
-        all_buffer_names = OrderedSet()
-
-        # Get input buffers from args
-        all_buffer_names.update(self.args.input_buffers.keys())
-        # Get output buffers from args
-        all_buffer_names.update(self.args.output_buffers.keys())
-        # Also get any intermediate buffers from the graph
-        all_buffer_names.update(V.graph.name_to_buffer.keys())
-
-        # Get shapes and sizes for all buffers
-        # Use try/except to handle special layouts (MultiOutputLayout, NoneLayout, etc.)
-        # that don't support get_size()
-        buf_info = []
-        for buf_name in all_buffer_names:
-            try:
-                buf = V.graph.get_buffer(buf_name)
-                if buf is None:
-                    continue
-                size = buf.get_size()
-                shape = tuple(self._safe_int(s) or s for s in size)
-                # Calculate flattened size
-                total_size = 1
-                for s in size:
-                    int_s = self._safe_int(s)
-                    total_size *= int_s if int_s is not None else s
-                buf_info.append((buf_name, shape, total_size))
-            except Exception:
-                pass
-
-        # Use masked ops when:
-        # 1. We're on GPU (Mosaic requires power-of-2 sizes)
-        # 2. All buffers have the same flattened size (for correct broadcasting)
-        # 3. Any dimension has non-power-of-2 size
-        #
-        # For multi-D tensors, we flatten to 1D and use masked loads/stores.
-        # The mask handles out-of-bounds elements when padding to power-of-2.
-        if buf_info and len(buf_info) > 0:
-            # Check if all have the same flattened size
-            first_size = buf_info[0][2]
-            all_same_size = all(size == first_size for _, _, size in buf_info)
-            if not all_same_size:
-                return False
-
-            # Check if any dimension is non-power-of-2
-            def is_power_of_2(n):
-                return n > 0 and (n & (n - 1)) == 0
-
-            has_non_pow2 = False
-            for _, shape, _ in buf_info:
-                for dim in shape:
-                    if isinstance(dim, int) and not is_power_of_2(dim):
-                        has_non_pow2 = True
-                        break
-                if has_non_pow2:
-                    break
-
-            # Use masked ops if any dimension is non-power-of-2
-            return has_non_pow2
-
-        return False
-
-    def _get_or_create_mask(self, buf_name: str) -> str:
-        """Get or create a unique mask variable for a buffer."""
-        if buf_name not in self.tensor_masks:
-            mask_var = f"mask_{buf_name}"
-            self.tensor_masks[buf_name] = mask_var
-        return self.tensor_masks[buf_name]
-
-    def _ensure_masked_ops_initialized(self) -> None:
-        """Initialize masked ops strategy on first load/store if not yet determined."""
-        if self.use_masked_ops is None:
-            self.use_masked_ops = self._determine_masked_ops_for_kernel()
-
     @staticmethod
     def _safe_int(val: Any) -> Optional[int]:
         """Convert value to int, returning None on failure."""
@@ -1394,6 +2639,69 @@ class PallasKernel(SIMDKernel):
                     return None
                 result *= numel
         return result
+
+    def _can_use_tma_approach(self) -> bool:
+        """
+        Check if TMA (Tensor Memory Accelerator) approach can be used.
+        TMA works for simple element-wise ops but not for:
+        - Reductions (need different accumulation patterns)
+          TODO: TMA supports float64 for loading but not for reductions
+        - Broadcasting (inputs have different shapes or output differs)
+        - Non-contiguous tensors (strided, transposed)
+        """
+        # Check for reductions
+        reduction_numel = self._compute_reduction_numel()
+        if reduction_numel is not None and reduction_numel > 1:
+            return False
+
+        # Check all input buffers for contiguity, dtype, and shape consistency
+        input_shapes: list[tuple] = []
+        for name in self.args.input_buffers:
+            buf_obj, buf_size, buf_numel, actual_strides, is_contiguous = (
+                self._get_buffer_info(name)
+            )
+            if not is_contiguous:
+                return False
+
+            # Check for unsupported dtypes
+            # TODO: TMA supports float64 for loading but current JAX Mosaic GPU
+            # implementation doesn't support it yet. Re-enable when JAX adds support.
+            buf_dtype = getattr(buf_obj, "get_dtype", lambda: None)()
+            if buf_dtype is not None:
+                import torch
+
+                if buf_dtype == torch.float64:
+                    return False
+
+            # Collect shape as tuple for comparison
+            shape_tuple = tuple(self._safe_int(s) for s in buf_size)
+            if None in shape_tuple:
+                return False  # Dynamic shapes not supported
+            input_shapes.append(shape_tuple)
+
+        # Check if all input shapes are identical (no broadcasting)
+        if input_shapes and len(OrderedSet(input_shapes)) > 1:
+            return False
+
+        # Check that output numel matches input numel (no broadcasting expansion)
+        if input_shapes:
+            input_numel = 1
+            for s in input_shapes[0]:
+                input_numel *= s
+
+            # Compute output numel from pointwise range trees (non-reduction)
+            output_numel = 1
+            for tree in self.range_trees:
+                if not tree.is_reduction:
+                    numel = self._safe_int(tree.numel)
+                    if numel is None:
+                        return False  # Dynamic shapes not supported
+                    output_numel *= numel
+
+            if output_numel != input_numel:
+                return False
+
+        return True
 
     def _get_buffer_info(self, name: str) -> tuple[Any, Any, Any, list, bool]:
         """Get buffer metadata (buf_obj, buf_size, buf_numel, actual_strides, is_contiguous)."""
@@ -1616,35 +2924,124 @@ class PallasKernel(SIMDKernel):
         index: sympy.Expr,
         index_str: str,
         needs_flatten: bool,
-        use_masked: bool,
     ) -> str:
         """
         Build the load expression based on indexing mode.
         """
-        if use_masked:
-            # GPU masked load: flatten tensor and apply per-tensor mask
-            mask_var = self._get_or_create_mask(name)
-            return f"pltriton.load({buf}.at[pl.ds(block_size)], mask={mask_var})"
-        elif needs_flatten:
+
+        if needs_flatten:
             # Flatten then index for non-contiguous access (gather operation)
-            if self.is_gpu:
-                # GPU: use pltriton.load with explicit offsets
-                return f"pltriton.load({buf}.at[{index_str}])"
-            else:
-                # CPU: use JAX array indexing
-                has_minmax = index.has(sympy.Min) or index.has(sympy.Max)
-                idx = f"({index_str}).astype(jnp.int64)" if has_minmax else index_str
-                return f"{buf}[...].flatten()[{idx}]"
+            has_minmax = index.has(sympy.Min) or index.has(sympy.Max)
+            idx = f"({index_str}).astype(jnp.int64)" if has_minmax else index_str
+            load_expr = f"{buf}[...].flatten()[{idx}]"
+
+            # For indexed loads, the result shape is determined by index expression
+            # broadcast. This may not match the canonical output shape needed for
+            # correct binary op broadcasting. Reshape to canonical shape when:
+            # 1. We have a canonical output shape
+            # 2. Buffer numel matches canonical numel (same total elements)
+            # This ensures shapes like (6, 2) become (2, 3, 2) for correct broadcasting.
+            canonical = self._get_canonical_output_shape()
+            if canonical is not None:
+                canonical_numel = 1
+                for s in canonical:
+                    canonical_numel *= s
+
+                # Try to get buffer size to verify numel matches
+                buf_obj = V.graph.get_buffer(name)
+                should_reshape = False
+                if buf_obj is not None:
+                    buf_size = buf_obj.get_size()
+                    buf_numel = 1
+                    for s in buf_size:
+                        buf_numel_val = self._safe_int(s)
+                        if buf_numel_val is None:
+                            buf_numel = None
+                            break
+                        buf_numel *= buf_numel_val
+
+                    if buf_numel is not None and buf_numel == canonical_numel:
+                        should_reshape = True
+                else:
+                    # For input buffers not in graph.buffers, reshape unconditionally
+                    # since indexed loads must produce matching numel
+                    should_reshape = True
+
+                if should_reshape:
+                    shape_str = ", ".join(str(s) for s in canonical)
+                    load_expr = f"{load_expr}.reshape({shape_str})"
+
+            return load_expr
         else:
             # Direct indexing for contiguous access
             load_expr = f"{buf}[{index_str}]"
 
-            # Check for transposed access
-            if index_str == "..." and self._is_transposed_access(name, index):
-                load_expr = f"jnp.transpose({load_expr})"
-                self.has_transposed_load = True
+            # Check for transposed access (N-D transpose support)
+            if index_str == "...":
+                transpose_axes = self._get_transpose_axes(name, index)
+                if transpose_axes is not None:
+                    axes_str = ", ".join(str(a) for a in transpose_axes)
+                    load_expr = f"jnp.transpose({load_expr}, axes=({axes_str},))"
+                    self.has_transposed_load = True
+                else:
+                    # Also check if buffer shape is transpose of output shape
+                    # This handles cases where index pattern is normal but output
+                    # shape differs (e.g., x.t() where x is accessed normally but
+                    # output needs transposed shape)
+                    load_expr = self._maybe_transpose_for_output_shape(
+                        name, load_expr
+                    )
 
             return load_expr
+
+    def _maybe_transpose_for_output_shape(
+        self, name: str, load_expr: str
+    ) -> str:
+        """
+        Transpose buffer if its shape is the transpose of the output shape.
+
+        This handles cases like x.t() + y where:
+        - x has shape (N, M) with normal row-major strides
+        - x.t() should have shape (M, N)
+        - The kernel output shape is (M, N)
+
+        The index expression accesses x in normal row-major order, but we need
+        the data in transposed shape for the output. In this case, we need to
+        apply jnp.transpose() on load.
+        """
+        buf_obj = V.graph.get_buffer(name)
+        if buf_obj is None:
+            return load_expr
+
+        buf_size = buf_obj.get_size()
+        buf_size_ints = [self._safe_int(s) for s in buf_size]
+        if None in buf_size_ints or len(buf_size_ints) != 2:
+            return load_expr
+
+        # Get output buffer shape
+        output_shape = None
+        output_buffers = getattr(self.args, "output_buffers", {})
+        for out_name in output_buffers:
+            out_buf = V.graph.get_buffer(out_name)
+            if out_buf is not None:
+                out_size = [self._safe_int(s) for s in out_buf.get_size()]
+                if None not in out_size and len(out_size) == 2:
+                    output_shape = out_size
+                    break
+
+        if output_shape is None:
+            return load_expr
+
+        # Check if buffer shape is transpose of output shape (same dims, reversed)
+        if (
+            buf_size_ints != output_shape
+            and sorted(buf_size_ints) == sorted(output_shape)
+            and buf_size_ints == list(reversed(output_shape))
+        ):
+            self.has_transposed_load = True
+            return f"jnp.transpose({load_expr})"
+
+        return load_expr
 
     def _maybe_squeeze_intermediate_buffer(self, name: str, load_expr: str) -> str:
         """
@@ -1669,6 +3066,97 @@ class PallasKernel(SIMDKernel):
                 buf_size = buf_obj.get_size()
                 if len(buf_size) == 2 and buf_size[-1] == 1:
                     return f"jnp.squeeze({load_expr}, axis=-1)"
+
+        return load_expr
+
+    def _maybe_reshape_intermediate_buffer(self, name: str, load_expr: str) -> str:
+        """
+        Reshape buffers to match the canonical output shape.
+
+        This handles cases like embedding + residual where:
+        - Embedding output has shape (batch, seq, hidden) = (2, 16, 64)
+        - Intermediate buffer has shape (batch*seq, hidden) = (32, 64)
+        These need reshape to broadcast correctly.
+        """
+        buf_obj = V.graph.get_buffer(name)
+        if buf_obj is None:
+            return load_expr
+
+        # Don't reshape non-floating-point tensors (like int64 indices)
+        # They have specific shapes that shouldn't be changed for broadcasting
+        dtype = V.graph.get_dtype(name)
+        if dtype is not None and not dtype.is_floating_point:
+            return load_expr
+
+        buf_size = buf_obj.get_size()
+        buf_size_ints = [self._safe_int(s) for s in buf_size]
+        if None in buf_size_ints:
+            return load_expr
+
+        # Get canonical output shape for this kernel
+        output_shape = self._get_canonical_output_shape()
+        if output_shape is None:
+            return load_expr
+
+        # Compute numels for different shape options
+        buf_numel = 1
+        for s in buf_size_ints:
+            buf_numel *= s
+        output_numel = 1
+        for s in output_shape:
+            output_numel *= s
+        output_shape_no_keepdims = [s for s in output_shape if s != 1]
+        output_numel_no_keepdims = 1
+        for s in output_shape_no_keepdims:
+            output_numel_no_keepdims *= s
+
+        # Check if buffer already matches target shape
+        if buf_size_ints == list(output_shape):
+            return load_expr
+        if buf_size_ints == output_shape_no_keepdims:
+            return load_expr
+
+        # Check if buffer shape is a TRANSPOSE of output shape (same dims, different order)
+        # In this case, we need jnp.transpose(), not reshape() - they have different semantics!
+        # reshape() just reinterprets the flat array; transpose() actually reorders elements.
+        if len(buf_size_ints) == len(output_shape) and sorted(buf_size_ints) == sorted(output_shape):
+            # Check if it's a simple 2D transpose (most common case)
+            if len(buf_size_ints) == 2 and buf_size_ints == list(reversed(output_shape)):
+                self.has_transposed_load = True
+                return f"jnp.transpose({load_expr})"
+            # For N-D, compute the permutation
+            if len(set(buf_size_ints)) == len(buf_size_ints):  # All dims unique
+                axes = []
+                for out_dim_size in output_shape:
+                    for i, buf_dim_size in enumerate(buf_size_ints):
+                        if buf_dim_size == out_dim_size and i not in axes:
+                            axes.append(i)
+                            break
+                if len(axes) == len(output_shape) and axes != list(range(len(axes))):
+                    axes_str = ", ".join(str(a) for a in axes)
+                    self.has_transposed_load = True
+                    return f"jnp.transpose({load_expr}, axes=({axes_str},))"
+
+        # Decide which target shape to use based on buffer characteristics:
+        # - If buffer has a 1 dimension (likely keepdims result), use full output_shape
+        # - If buffer numel matches full output shape, use full output_shape
+        # - Otherwise, use output_shape without keepdims
+        has_keepdims_dim = 1 in buf_size_ints
+        if has_keepdims_dim and buf_numel == output_numel:
+            # Buffer has keepdims dimension, reshape to full canonical shape
+            if len(output_shape) > len(buf_size_ints):
+                shape_str = ", ".join(str(s) for s in output_shape)
+                return f"{load_expr}.reshape({shape_str})"
+        elif buf_numel == output_numel_no_keepdims:
+            # Buffer matches non-keepdims numel, reshape to non-keepdims shape
+            if len(output_shape_no_keepdims) > len(buf_size_ints):
+                shape_str = ", ".join(str(s) for s in output_shape_no_keepdims)
+                return f"{load_expr}.reshape({shape_str})"
+        elif buf_numel == output_numel:
+            # Buffer matches full numel, reshape to full shape
+            if len(output_shape) > len(buf_size_ints):
+                shape_str = ", ".join(str(s) for s in output_shape)
+                return f"{load_expr}.reshape({shape_str})"
 
         return load_expr
 
@@ -1737,6 +3225,118 @@ class PallasKernel(SIMDKernel):
         reshape_dims = [1] * len(ref_buf_size)
         reshape_dims[axis_pos] = -1
         return f"{load_expr}.reshape({', '.join(map(str, reshape_dims))})"
+
+    def _maybe_reshape_for_expand(
+        self, name: str, index: sympy.Expr, load_expr: str
+    ) -> str:
+        """
+        Reshape buffer for expand patterns (stride=0 dimensions).
+
+        When cloning an expanded view, the input buffer has fewer elements than
+        the output. This detects which iteration variables are unused (coefficient=0
+        in the load index, corresponding to stride=0 expanded dimensions) and
+        reshapes the loaded buffer to insert singleton dimensions at those positions.
+
+        For example, if output shape is (2, 16, 2, 2, 16) and input is (2, 16, 2, 16),
+        and dimension 3 is expanded (stride=0), we reshape input from (2, 16, 2, 16)
+        to (2, 16, 2, 1, 16) so JAX broadcast_to can expand to (2, 16, 2, 2, 16).
+        """
+        # Skip if load_expr already has a reshape (e.g., from _maybe_broadcast_1d_buffer)
+        # to avoid double reshaping which causes shape mismatches
+        if ".reshape(" in load_expr:
+            return load_expr
+
+        buf_obj = V.graph.get_buffer(name)
+        if buf_obj is None:
+            return load_expr
+
+        buf_size = buf_obj.get_size()
+        buf_size_ints = [self._safe_int(s) for s in buf_size]
+        if None in buf_size_ints:
+            return load_expr
+
+        buf_numel = 1
+        for s in buf_size_ints:
+            buf_numel *= s
+
+        # Get all iteration variables (excluding reduction vars for output shape)
+        all_iter_vars = list(self.range_tree_nodes.keys())
+        used_vars = self._get_used_iter_vars(index)
+
+        # Find unused iteration variables (these correspond to expanded dims)
+        unused_vars = [v for v in all_iter_vars if v not in used_vars]
+        if not unused_vars:
+            return load_expr
+
+        # Build output shape from iteration variables, sorted by divisor (high to low)
+        # This gives dimension order: higher divisor = earlier dimension
+        var_items = sorted(
+            [
+                (v, e)
+                for v, e in self.range_tree_nodes.items()
+                if not e.is_reduction
+            ],
+            key=lambda x: self._safe_int(x[1].divisor) or 0,
+            reverse=True,
+        )
+
+        # Compute output numel from iteration variable lengths
+        # Detect and exclude linear index variables (divisor=1, length=product of others)
+        var_lengths: list[tuple[int | None, int | None]] = []
+        for var, entry in var_items:
+            length = self._safe_int(entry.length)
+            divisor = self._safe_int(entry.divisor)
+            var_lengths.append((length, divisor))
+
+        output_numel = 1
+        for i, (length, divisor) in enumerate(var_lengths):
+            if length is None:
+                continue
+
+            # Check if this is a linear index variable (divisor=1, length=product of others)
+            if divisor == 1 and len(var_lengths) > 1:
+                other_product = 1
+                for j, (other_len, _) in enumerate(var_lengths):
+                    if j != i and other_len is not None:
+                        other_product *= other_len
+
+                if length == other_product:
+                    # This is a linear index variable - skip it
+                    continue
+
+            output_numel *= length
+
+        # Only handle expand pattern: output has more elements than input
+        if buf_numel >= output_numel or buf_numel == 0:
+            return load_expr
+
+        # Build the target shape: use buffer dimensions for used vars, 1 for unused vars
+        # The order is determined by divisor (higher divisor = earlier dimension)
+        target_shape = []
+        buf_dim_idx = 0
+        for var, entry in var_items:
+            if var in unused_vars:
+                # This is an expanded dimension - insert singleton
+                target_shape.append(1)
+            else:
+                # This dimension maps to actual buffer data
+                if buf_dim_idx < len(buf_size_ints):
+                    target_shape.append(buf_size_ints[buf_dim_idx])
+                    buf_dim_idx += 1
+                else:
+                    # More used vars than buffer dims - fallback
+                    return load_expr
+
+        if buf_dim_idx != len(buf_size_ints):
+            # Didn't use all buffer dimensions - fallback
+            return load_expr
+
+        # Check if reshape is actually needed
+        if target_shape == buf_size_ints:
+            return load_expr
+
+        shape_str = ", ".join(str(s) for s in target_shape)
+        return f"{load_expr}.reshape({shape_str})"
 
     def _check_im2col_pattern(
         self, index: sympy.Expr, index_str: str, needs_flatten: bool
@@ -1902,13 +3502,68 @@ class PallasKernel(SIMDKernel):
 
         return True
 
+    def _get_broadcast_shape_for_expand(self, name: str) -> Optional[tuple[int, ...]]:
+        """
+        Get the intermediate broadcast shape for an expand pattern.
+
+        For expand operations (stride=0 dimensions), returns the output shape
+        with 1s at the expanded (stride=0) dimensions. This allows the value
+        to be reshaped to this intermediate shape and then broadcast.
+
+        Returns None if stride info is not available or if there are no
+        stride=0 dimensions (not an expand pattern).
+        """
+        buf = V.graph.get_buffer(name)
+        if buf is None:
+            return None
+
+        layout = getattr(buf, "get_layout", lambda: None)()
+        if layout is None:
+            return None
+
+        buf_stride = getattr(layout, "stride", None)
+        buf_size = buf.get_size()
+
+        if buf_stride is None or len(buf_stride) != len(buf_size):
+            return None
+
+        # Build intermediate shape: use 1 where stride=0, original size elsewhere
+        intermediate_shape = []
+        has_expand = False
+        for i, (size, stride) in enumerate(zip(buf_size, buf_stride)):
+            size_int = self._safe_int(size)
+            stride_int = self._safe_int(stride)
+            if size_int is None:
+                return None  # Dynamic size, can't precompute
+            if stride_int == 0:
+                intermediate_shape.append(1)
+                has_expand = True
+            else:
+                intermediate_shape.append(size_int)
+
+        # Only return shape if there's actually an expand (stride=0) dimension
+        # Otherwise let the runtime helper figure it out
+        if not has_expand:
+            return None
+
+        return tuple(intermediate_shape)
+
     def _build_full_array_store_expr(
-        self, out: str, value: CSEVariable, needs_transpose: bool
+        self, out: str, value: CSEVariable, needs_transpose: bool,
+        broadcast_shape: Optional[tuple[int, ...]] = None,
+        permute_axes: Optional[tuple[int, ...]] = None
     ) -> str:
         """
         Build store expression for full array assignment.
 
-        Handles scalar broadcast, shape matching, and optional transpose.
+        Handles scalar broadcast, shape matching, optional transpose, and
+        expand patterns (where input needs singleton dims inserted for broadcast).
+
+        Args:
+            broadcast_shape: If provided, the intermediate shape to reshape to
+                           before broadcasting (for expand patterns with stride=0).
+            permute_axes: If provided, apply jnp.transpose with these axes when
+                         value shape differs from output shape (permute operation).
         """
         if needs_transpose:
             return (
@@ -1916,11 +3571,30 @@ class PallasKernel(SIMDKernel):
                 f"jnp.full({out}.shape, {value}) if jnp.asarray({value}).ndim == 0 "
                 f"else jnp.transpose(jnp.asarray({value})))"
             )
-        else:
+        elif broadcast_shape is not None:
+            # Use precomputed broadcast shape for expand pattern
             return (
                 f"{out}[...] = ("
                 f"jnp.full({out}.shape, {value}) if jnp.asarray({value}).ndim == 0 "
-                f"else (jnp.broadcast_to(jnp.asarray({value}), {out}.shape) "
+                f"else (jnp.broadcast_to(jnp.asarray({value}).reshape(-1).reshape({broadcast_shape}), {out}.shape) "
+                f"if jnp.asarray({value}).size != {out}.size "
+                f"else jnp.asarray({value}).reshape({out}.shape)))"
+            )
+        elif permute_axes is not None:
+            # Apply permutation when input and output shapes differ by a transpose
+            axes_str = ", ".join(str(a) for a in permute_axes)
+            return (
+                f"{out}[...] = ("
+                f"jnp.full({out}.shape, {value}) if jnp.asarray({value}).ndim == 0 "
+                f"else jnp.transpose(jnp.asarray({value}), axes=({axes_str},)))"
+            )
+        else:
+            # Fall back to runtime helper for expand patterns without stride info.
+            # Use _pallas_expand_for_broadcast helper which handles this at runtime.
+            return (
+                f"{out}[...] = ("
+                f"jnp.full({out}.shape, {value}) if jnp.asarray({value}).ndim == 0 "
+                f"else (_pallas_expand_for_broadcast(jnp.asarray({value}), {out}.shape) "
                 f"if jnp.asarray({value}).size != {out}.size "
                 f"else jnp.asarray({value}).reshape({out}.shape)))"
             )
@@ -1933,35 +3607,45 @@ class PallasKernel(SIMDKernel):
         value: CSEVariable,
         index_str: str,
         needs_flatten: bool,
-        use_masked: bool,
         mode: Any = None,
     ) -> str:
         """
         Build the store expression based on indexing mode.
         mode can be None (set) or "atomic_add" (accumulate).
         """
-        if use_masked:
-            # GPU masked store: flatten tensor and apply per-tensor mask
-            mask_var = self._get_or_create_mask(name)
-            return (
-                f"pltriton.store({out}.at[pl.ds(block_size)], {value}, mask={mask_var})"
-            )
-
         if index_str == "...":
             # Full array store with shape matching
             needs_transpose = self._check_store_needs_transpose(name)
-            return self._build_full_array_store_expr(out, value, needs_transpose)
+            broadcast_shape = self._get_broadcast_shape_for_expand(name)
+            # Check if a permutation is needed (input/output shapes differ by transpose)
+            # IMPORTANT: Skip permute_axes if we already transposed on load - the data
+            # is already in the correct shape and doesn't need another permutation.
+            permute_axes = (
+                self._get_permute_axes_for_store()
+                if not needs_transpose and broadcast_shape is None and not self.has_transposed_load
+                else None
+            )
+            return self._build_full_array_store_expr(out, value, needs_transpose, broadcast_shape, permute_axes)
 
         if needs_flatten:
             # Block variable indexing (e.g., im2col) - use flattened scatter
             scatter_op = "add" if mode == "atomic_add" else "set"
-            if self.is_gpu:
-                return f"pltriton.store({out}.at[{index_str}], jnp.asarray({value}))"
-            else:
+            # Check if a permutation is needed (input/output shapes differ by transpose)
+            permute_info = self._get_permute_info_for_store()
+            if permute_info is not None:
+                input_shape, output_shape, permute_axes = permute_info
+                input_shape_str = ", ".join(str(s) for s in input_shape)
+                axes_str = ", ".join(str(a) for a in permute_axes)
+                # Reshape value to intermediate shape, transpose, then flatten
                 return (
                     f"{out}[...] = {out}[...].flatten().at[({index_str}).flatten()].{scatter_op}("
-                    f"jnp.asarray({value}).flatten()).reshape({out}.shape)"
+                    f"jnp.transpose(jnp.asarray({value}).reshape({input_shape_str}), "
+                    f"axes=({axes_str},)).flatten()).reshape({out}.shape)"
                 )
+            return (
+                f"{out}[...] = {out}[...].flatten().at[({index_str}).flatten()].{scatter_op}("
+                f"jnp.asarray({value}).flatten()).reshape({out}.shape)"
+            )
 
         # Direct indexed assignment
         has_indirect = self._has_indirect_vars(index)
@@ -1971,7 +3655,8 @@ class PallasKernel(SIMDKernel):
             buf_size = buf.get_size()
             if len(buf_size) > 1 and not self._has_iteration_vars(index):
                 # Multi-dim output with constant index - use [...] for full assignment
-                return self._build_full_array_store_expr(out, value, False)
+                broadcast_shape = self._get_broadcast_shape_for_expand(name)
+                return self._build_full_array_store_expr(out, value, False, broadcast_shape)
 
         if has_indirect:
             # Indirect indexed store (scatter): use .add() for atomic_add, .set() otherwise
@@ -2065,7 +3750,11 @@ class PallasKernel(SIMDKernel):
         else:
             # Slice-based scatter: use : for iteration dimensions
             index_parts = [":" for _ in dims_before]
-            index_parts.append(indirect_var)
+            # Flatten indirect variable to 1D for JAX scatter semantics.
+            # The variable may have extra dims from _maybe_reshape_for_expand
+            # (e.g., shape (601, 1) instead of (601,)), which would cause JAX
+            # to expect a different value shape for broadcasting.
+            index_parts.append(f"{indirect_var}.reshape(-1)")
             index_parts.extend(":" for _ in dims_after)
 
         index_tuple = ", ".join(index_parts)
@@ -2081,8 +3770,6 @@ class PallasKernel(SIMDKernel):
         # Track the load index expression for argmax/argmin axis detection
         self.load_index_exprs[name] = index
 
-        self._ensure_masked_ops_initialized()
-
         # Get base index expression
         index_str, needs_flatten = self._get_index_expr(index)
 
@@ -2096,27 +3783,31 @@ class PallasKernel(SIMDKernel):
             name, index, index_str, needs_flatten
         )
 
-        # Determine if masked operations should be used
-        use_masked = (
-            index_str == "..." and not needs_flatten and self.use_masked_ops is True
-        )
-
         # Build the load expression
-        load_expr = self._build_load_expr(
-            buf, name, index, index_str, needs_flatten, use_masked
-        )
+        load_expr = self._build_load_expr(buf, name, index, index_str, needs_flatten)
 
         # Handle intermediate buffer squeezing for correct broadcasting
         if not needs_flatten and index_str == "...":
             load_expr = self._maybe_squeeze_intermediate_buffer(name, load_expr)
+            # Reshape intermediate buffers to match canonical output shape
+            # This handles cases like embedding + residual where buffer is (32, 64)
+            # but should be (2, 16, 64) to match the kernel's output shape.
+            load_expr = self._maybe_reshape_intermediate_buffer(name, load_expr)
             # Handle 1D buffer broadcasting for higher-dimensional kernels
             load_expr = self._maybe_broadcast_1d_buffer(name, index, load_expr)
+            # Handle expand patterns (stride=0 dimensions) by inserting singleton dims
+            load_expr = self._maybe_reshape_for_expand(name, index, load_expr)
 
-        return self.cse.generate(
+        result = self.cse.generate(
             self.compute,
             load_expr,
             dtype=dtype,
         )
+
+        # Track the shape of this variable for on-demand reshape at binary ops
+        self._track_var_shape(str(result), name, load_expr, index)
+
+        return result
 
     def _handle_mixed_indexing(self, index: sympy.Expr) -> str:
         """
@@ -2188,6 +3879,34 @@ class PallasKernel(SIMDKernel):
                     renamed_size = self.rename_indexing(range_size)
                     arange_expr = f"jnp.arange({self.kexpr(renamed_size)})"
                     index_str = index_str.replace(var_name, arange_expr)
+                # Reshape indirect var for proper broadcasting with reduction var
+                # e.g., tmp5 shape (2,16) + arange(64) shape (64,) won't broadcast
+                # but tmp5[..., None] shape (2,16,1) + (64,) -> (2,16,64) works
+                # However, if indirect var is already 1D, adding [..., None] would
+                # create wrong broadcast: (N,1) + (N,) -> (N,N) instead of (N,)
+                indirect_var = indirect_vars[0]
+                indirect_shape = self.var_shapes.get(indirect_var)
+
+                # Check if the kernel has any pointwise (non-reduction) iteration vars
+                # If all vars are reduction vars (pure reduction kernel), the indirect
+                # var is element-wise with the reduction, so no broadcast needed
+                all_iter_vars = self._get_iter_vars()
+                has_pointwise_vars = any(
+                    not self.range_tree_nodes[v].is_reduction
+                    for v in all_iter_vars
+                    if v in self.range_tree_nodes
+                )
+
+                # Only add [..., None] if:
+                # 1. We know the indirect var is multi-dimensional, OR
+                # 2. Shape is unknown AND kernel has pointwise vars (need broadcast)
+                if len(indirect_shape or ()) > 1 or (
+                    indirect_shape is None and has_pointwise_vars
+                ):
+                    index_str = index_str.replace(
+                        indirect_var, f"{indirect_var}[..., None]"
+                    )
+                # else: 1D indirect var or pure reduction kernel - element-wise
                 return index_str
             # For pointwise vars, fall through to the complex reshape code
 
@@ -2328,8 +4047,6 @@ class PallasKernel(SIMDKernel):
         out = self.args.output(name)
         self.store_buffer_names.add(name)
 
-        self._ensure_masked_ops_initialized()
-
         # Check if this is a scalar output (reduction to scalar)
         buf = V.graph.get_buffer(name)
         is_scalar = buf is not None and len(buf.get_size()) == 0
@@ -2358,16 +4075,9 @@ class PallasKernel(SIMDKernel):
                     index, index_str, needs_flatten
                 )
 
-                # Determine if masked operations should be used
-                use_masked = (
-                    index_str == "..."
-                    and not needs_flatten
-                    and self.use_masked_ops is True
-                )
-
                 # Build the store expression
                 store_expr = self._build_store_expr(
-                    out, name, index, value, index_str, needs_flatten, use_masked, mode
+                    out, name, index, value, index_str, needs_flatten, mode
                 )
 
         self.stores.writeline(store_expr)
@@ -2559,6 +4269,8 @@ class PallasKernel(SIMDKernel):
                 and pointwise_numel > 1
                 and reduction_numel
             )
+            # argmax/argmin doesn't use symbolic partial reduction logic
+            is_symbolic_partial = False
             if is_partial_reduction and n_reduction_dims > 0:
                 # Partial reduction: determine the reduction axis from load index
                 # The reduction variable's coefficient in the index expression tells us its stride
@@ -2640,6 +4352,21 @@ class PallasKernel(SIMDKernel):
             dtype=dtype,
         )
 
+        # Track reduction output shape for binary op broadcasting
+        # For partial reductions with keepdims, output shape is (pointwise_numel, 1)
+        # flattened, which will be reshaped to canonical output with 1s in reduced dims
+        if is_partial_reduction:
+            # Output shape is (pointwise_numel, 1) - pointwise dims with 1 for reduced dim
+            self.var_shapes[reduction_expr] = (pointwise_numel, 1)
+            self.var_shapes[str(result)] = (pointwise_numel, 1)
+        elif is_symbolic_partial:
+            # Symbolic: we don't know exact shape, but it's a partial reduction
+            pass  # Can't track precisely
+        else:
+            # Full reduction to scalar
+            self.var_shapes[reduction_expr] = ()
+            self.var_shapes[str(result)] = ()
+
         # Cache the result
         self.cse.reduction_cache[cache_key] = result
         return result
@@ -2701,8 +4428,8 @@ class PallasKernel(SIMDKernel):
                 )
         interpret_literal = "True" if interpret_is_cpu else "False"
 
-        # For GPU (Mosaic backend), import plgpu for masked loads/stores
-        # Import math for masked ops and symbolic expressions (e.g., math.floor, math.log2)
+        # For GPU (Mosaic backend), import plgpu for TMA operations
+        # Import math for symbolic expressions (e.g., math.floor, math.log2)
         imports = """
 import functools
 import math
@@ -2735,6 +4462,178 @@ def _pallas_partial_reduce(reduce_fn, v, pw_numel, red_numel):
     reordered = jnp.moveaxis(v, pw_axes, list(range(len(pw_axes))))
     result = reduce_fn(reordered.reshape(pw_numel, red_numel), axis=-1)
     return result.reshape(out_shape)
+def _pallas_expand_for_broadcast(v, target_shape):
+    # Helper for expand patterns: reshape value to be broadcastable to target_shape.
+    # For expand (stride=0), value has fewer elements. We insert singleton dims
+    # as needed for broadcast compatibility.
+    # E.g., (2, 16, 2, 16) -> (2, 16, 2, 1, 16) to broadcast to (2, 16, 2, 2, 16)
+    v_shape = list(v.shape)
+    t_shape = list(target_shape)
+    v_numel = 1
+    for s in v_shape:
+        v_numel *= s
+    t_numel = 1
+    for s in t_shape:
+        t_numel *= s
+    # Case 1: Same numel - just reshape directly
+    if v_numel == t_numel:
+        return v.reshape(target_shape)
+    # Case 2: Same ndim but different numel (view + expand pattern)
+    # E.g., input (2, 16, 2, 8, 2) with 1024 elements -> target (2, 16, 2, 2, 16) with 2048
+    # The input needs to be reshaped to match the target with 1s at expanded positions.
+    # Key insight: find common prefix between input and target shapes, then work on suffix.
+    if len(v_shape) == len(t_shape) and v_numel < t_numel:
+        # Find how many leading dimensions match
+        common_prefix_len = 0
+        for i in range(len(t_shape)):
+            if i < len(v_shape) and v_shape[i] == t_shape[i]:
+                common_prefix_len = i + 1
+            else:
+                break
+        # Product of remaining v dims after the common prefix
+        v_remaining = 1
+        for s in v_shape[common_prefix_len:]:
+            v_remaining *= s
+        # Build intermediate shape: prefix + suffix with 1s at expansion positions
+        prefix = list(t_shape[:common_prefix_len])
+        suffix = list(t_shape[common_prefix_len:])
+        # Find which suffix dims to set to 1 to match v_remaining
+        for i in range(len(suffix)):
+            test_suffix = list(suffix)
+            test_suffix[i] = 1
+            test_numel = 1
+            for s in test_suffix:
+                test_numel *= s
+            if test_numel == v_remaining:
+                intermediate = prefix + test_suffix
+                return jnp.broadcast_to(v.reshape(-1).reshape(intermediate), target_shape)
+        # Try combinations of 2 dims in suffix
+        for i in range(len(suffix)):
+            for j in range(i + 1, len(suffix)):
+                test_suffix = list(suffix)
+                test_suffix[i] = 1
+                test_suffix[j] = 1
+                test_numel = 1
+                for s in test_suffix:
+                    test_numel *= s
+                if test_numel == v_remaining:
+                    intermediate = prefix + test_suffix
+                    return jnp.broadcast_to(v.reshape(-1).reshape(intermediate), target_shape)
+    # Case: Right-aligned expand (PyTorch expand semantics)
+    # E.g., (2, 1, 2) -> (2, 1, 2, 3, 2): value dims align to target's TRAILING dims
+    # Intermediate: [1, 1, 2, 1, 2] (prepend 1s, keep value dims)
+    if len(v_shape) < len(t_shape) and v_numel < t_numel:
+        extra_dims = len(t_shape) - len(v_shape)
+        trailing_target = list(t_shape[extra_dims:])
+        # Check if value dims are broadcast-compatible with trailing target dims
+        valid = True
+        for v_dim, t_dim in zip(v_shape, trailing_target):
+            if v_dim != t_dim and v_dim != 1:
+                valid = False
+                break
+        if valid:
+            intermediate = [1] * extra_dims + list(v_shape)
+            return jnp.broadcast_to(v.reshape(intermediate), target_shape)
+    # Case 3: Expand case - use value's shape to determine broadcast pattern
+    # The value's shape encodes the expand info: dims with size 1 are broadcast dims.
+    # E.g., value (64, 1, 16) -> target (2, 16, 2, 2, 16):
+    #   - Value dim 1 has size 1 -> this is the expand dimension
+    #   - Value dim 0 (64) = target dims 0,1,2 merged (2*16*2)
+    #   - Value dim 2 (16) = target dim 4
+    #   - Intermediate shape: (2, 16, 2, 1, 16)
+    if v_numel < t_numel:
+        # Find singleton (size=1) dimensions in value - these are expand dims
+        v_singletons = [i for i, s in enumerate(v_shape) if s == 1]
+        if v_singletons:
+            # Build intermediate shape by matching value dims to target dims
+            # Strategy: greedily match from both ends, insert 1s for singletons
+            intermediate = []
+            v_idx = 0
+            t_idx = 0
+            while t_idx < len(t_shape):
+                if v_idx >= len(v_shape):
+                    # No more value dims - remaining target dims should be 1s
+                    intermediate.append(1)
+                    t_idx += 1
+                elif v_idx in v_singletons:
+                    # This value dim is a singleton (expand dim)
+                    intermediate.append(1)
+                    v_idx += 1
+                    t_idx += 1
+                else:
+                    # Try to match value dim to consecutive target dims
+                    v_dim = v_shape[v_idx]
+                    t_dim = t_shape[t_idx]
+                    if v_dim == t_dim:
+                        # Direct match
+                        intermediate.append(t_dim)
+                        v_idx += 1
+                        t_idx += 1
+                    elif v_dim > t_dim:
+                        # Value dim is product of multiple target dims
+                        prod = t_dim
+                        intermediate.append(t_dim)
+                        t_idx += 1
+                        while t_idx < len(t_shape) and prod < v_dim:
+                            # Check if next target dim is a singleton (expand)
+                            if t_shape[t_idx] * prod == v_dim:
+                                intermediate.append(t_shape[t_idx])
+                                prod *= t_shape[t_idx]
+                                t_idx += 1
+                            elif v_idx + 1 < len(v_shape) and v_idx + 1 in v_singletons:
+                                # Next value dim is singleton, insert 1 here
+                                intermediate.append(1)
+                                t_idx += 1
+                                break
+                            else:
+                                intermediate.append(t_shape[t_idx])
+                                prod *= t_shape[t_idx]
+                                t_idx += 1
+                        v_idx += 1
+                    else:
+                        # Can't match - insert 1 (assume expand dim)
+                        intermediate.append(1)
+                        t_idx += 1
+            # Verify intermediate shape has correct numel
+            inter_numel = 1
+            for s in intermediate:
+                inter_numel *= s
+            if inter_numel == v_numel and len(intermediate) == len(t_shape):
+                return jnp.broadcast_to(v.reshape(-1).reshape(intermediate), target_shape)
+        # Case: Standard broadcasting with fewer dimensions
+        # E.g., (256, 256) -> (256, 256, 256)
+        # Standard NumPy/PyTorch semantics: prepend 1s on the left
+        # ONLY applies when value's dims EXACTLY match target's TRAILING dims
+        if len(v_shape) < len(t_shape):
+            trailing_target = list(t_shape[-len(v_shape):])
+            if v_shape == trailing_target:
+                leading_ones = len(t_shape) - len(v_shape)
+                intermediate = [1] * leading_ones + v_shape
+                return jnp.broadcast_to(v.reshape(intermediate), target_shape)
+        # Fallback: try each target dim as the expand dim (try LEFT to RIGHT first
+        # to prefer standard broadcast semantics of prepending 1s)
+        for i in range(len(t_shape)):
+            test_shape = list(t_shape)
+            test_shape[i] = 1
+            test_numel = 1
+            for s in test_shape:
+                test_numel *= s
+            if test_numel == v_numel:
+                return jnp.broadcast_to(v.reshape(-1).reshape(test_shape), target_shape)
+    # Case 4: Fewer dims in v (non-expand case) - insert singletons by matching dims
+    if len(v_shape) < len(t_shape) and v_numel == t_numel:
+        # Scan from left to right, matching dimensions.
+        result_shape = []
+        v_idx = 0
+        for t_idx in range(len(t_shape)):
+            if v_idx < len(v_shape) and v_shape[v_idx] == t_shape[t_idx]:
+                result_shape.append(v_shape[v_idx])
+                v_idx += 1
+            else:
+                result_shape.append(1)
+        return jnp.broadcast_to(v.reshape(result_shape), target_shape)
+    # Fall back to direct broadcast
+    return jnp.broadcast_to(v, target_shape)
 """ + (
             "\nfrom jax.experimental.pallas import mosaic_gpu as plgpu"
             if not interpret_is_cpu
@@ -2787,41 +4686,10 @@ def _pallas_partial_reduce(reduce_fn, v, pw_numel, red_numel):
         # before generating the kernel signature.
         kernel_body = IndentedBuffer()
         with kernel_body.indent():
-            # For masked ops on GPU, generate per-tensor masks at the start
-            if self.use_masked_ops and self.tensor_masks:
-                # Create a mapping from buffer name to parameter name
-                buf_to_param = {}
-                for outer, inner in self.args.input_buffers.items():
-                    buf_to_param[outer] = inner if isinstance(inner, str) else outer
-                for outer, inner in self.args.output_buffers.items():
-                    buf_to_param[outer] = inner if isinstance(inner, str) else outer
-
-                # Generate a mask for each tensor that was accessed
-                for buf_name, mask_var in sorted(self.tensor_masks.items()):
-                    param_name = buf_to_param.get(buf_name, buf_name)
-                    # Find the corresponding parameter in kernel_params
-                    matching_param = None
-                    for p in kernel_params:
-                        # Check if this parameter corresponds to the buffer
-                        if param_name == p or buf_name in str(p):
-                            matching_param = p
-                            break
-
-                    if matching_param:
-                        # Calculate flattened size for this tensor
-                        kernel_body.writeline(f"# Mask for {buf_name}")
-                        kernel_body.writeline(
-                            f"{mask_var}_size = {matching_param}.size"
-                        )
-                        kernel_body.writeline(
-                            f"{mask_var} = jnp.arange(block_size) < {mask_var}_size"
-                        )
-
             # Generate iteration variables as jnp.arange arrays
             # These are used by index_expr operations like torch.arange
             # Skip on GPU - jnp.arange is not supported by Pallas Mosaic backend
-            # Skip on GPU with masked ops - iteration vars would create non-power-of-2 arrays
-            if self.range_tree_nodes and not self.use_masked_ops and not self.is_gpu:
+            if self.range_tree_nodes and not self.is_gpu:
                 kernel_body.writeline("# Define iteration variables as JAX arrays")
 
                 # Find reshape target: N-D shape whose numel matches an iteration
@@ -2992,12 +4860,7 @@ def _pallas_partial_reduce(reduce_fn, v, pw_numel, red_numel):
         full_kernel_params = alias_params + kernel_params
 
         # Now emit the kernel function with the correct signature
-        # For GPU with masked ops, add block_size as keyword-only parameter
-        kernel_signature = (
-            f"def {kernel_name}_kernel({', '.join(full_kernel_params)}"
-            + (", *, block_size" if self.use_masked_ops else "")
-            + "):"
-        )
+        kernel_signature = f"def {kernel_name}_kernel({', '.join(full_kernel_params)}):"
         code.writeline(kernel_signature)
 
         with code.indent():
@@ -3046,30 +4909,6 @@ def _pallas_partial_reduce(reduce_fn, v, pw_numel, red_numel):
             code.writeline("    for shape, dtype in zip(out_shapes, out_dtypes)")
             code.writeline(")")
 
-            # For masked ops, calculate block_size aligned to WARPGROUP_SIZE (128)
-            # Mosaic GPU runs with 128 threads (1 warpgroup), so data sizes should
-            # be at least 128 and aligned to 128 for efficient processing.
-            if self.use_masked_ops:
-                code.writeline(
-                    "# Calculate block_size aligned to warpgroup size (128) for Mosaic GPU"
-                )
-                code.writeline("# Find maximum flattened size across all tensors")
-                code.writeline("max_size = 0")
-                # Calculate size for all input tensors
-                for param in kernel_input_params:
-                    code.writeline(f"max_size = max(max_size, {param}.size)")
-                # Also consider output shapes
-                code.writeline("for shape in out_shapes:")
-                code.writeline(
-                    "    tensor_size = shape[0] if len(shape) == 1 else math.prod(shape)"
-                )
-                code.writeline("    max_size = max(max_size, tensor_size)")
-                # Align to WARPGROUP_SIZE (128) and ensure at least 128
-                code.writeline(
-                    "# Align to warpgroup size (128) for efficient GPU processing"
-                )
-                code.writeline("block_size = max(128, ((max_size + 127) // 128) * 128)")
-
             alias_pairs: list[tuple[int, int]] = []
             for out_idx, name in enumerate(output_params):
                 if name.startswith("out_ptr"):
@@ -3082,13 +4921,10 @@ def _pallas_partial_reduce(reduce_fn, v, pw_numel, red_numel):
                     alias_pairs.append((input_idx, out_idx))
             alias_map_literal = ", ".join(f"{i}: {o}" for (i, o) in alias_pairs)
 
-            # Wrap kernel with functools.partial to pass scalar arguments
-            # (size variables and block_size for masked ops)
+            # Wrap kernel with functools.partial to pass scalar arguments (size variables)
             partial_args = []
             for sv_param in size_var_params:
                 partial_args.append(f"{sv_param}={sv_param}")
-            if self.use_masked_ops:
-                partial_args.append("block_size=block_size")
 
             if partial_args:
                 kernel_arg = f"functools.partial({kernel_name}_kernel, {', '.join(partial_args)}),"
@@ -3096,7 +4932,179 @@ def _pallas_partial_reduce(reduce_fn, v, pw_numel, red_numel):
                 kernel_arg = f"{kernel_name}_kernel,"
 
             # Use plgpu.kernel for GPU (Mosaic), pl.pallas_call for CPU/TPU
-            if self.is_gpu:
+            # TMA approach requires: no reductions, all inputs contiguous, same sizes
+            use_tma = (
+                self.is_gpu and self.use_emit_pipeline and self._can_use_tma_approach()
+            )
+            if use_tma:
+                # Use lax.fori_loop with direct TMA for automatic OOB masking
+                # TMA (Tensor Memory Accelerator) automatically handles out-of-bounds
+                # accesses, eliminating the need for explicit padding to multiples of 128
+                code.writeline("# Use lax.fori_loop with TMA for automatic OOB masking")
+                code.writeline("from jax import lax")
+                code.writeline("_tile_size = 128  # Warpgroup size")
+                code.writeline("_orig_out_shapes = out_shapes")
+
+                # Calculate max numel across all inputs/outputs for grid calculation
+                code.writeline("_max_numel = 0")
+                for param in kernel_input_params:
+                    code.writeline(f"_max_numel = max(_max_numel, {param}.size)")
+                code.writeline("for shape in out_shapes:")
+                code.writeline("    _numel = 1")
+                code.writeline("    for s in shape:")
+                code.writeline("        _numel *= s")
+                code.writeline("    _max_numel = max(_max_numel, _numel)")
+
+                code.writeline(
+                    "_num_tiles = (_max_numel + _tile_size - 1) // _tile_size"
+                )
+
+                # Build param names for the kernel
+                gmem_input_params = [f"{p}_gmem" for p in kernel_input_params]
+                gmem_output_params = [f"{p}_gmem" for p in output_params]
+                smem_input_params = [f"{p}_smem" for p in kernel_input_params]
+                smem_output_params = [f"{p}_smem" for p in output_params]
+
+                # Generate the TMA kernel with fori_loop
+                code.writeline("")
+                code.writeline("# Wrapper kernel using lax.fori_loop with direct TMA")
+
+                # Kernel receives: *input_gmem_refs, *output_gmem_refs (from plgpu.kernel)
+                # Plus scratch SMEM buffers for inputs and outputs, and barriers for TMA
+                wrapper_kernel_params = gmem_input_params + gmem_output_params
+                all_smem_params = smem_input_params + smem_output_params
+                # Barrier params for TMA operations
+                barrier_params = [
+                    f"_barrier_{i}" for i in range(len(kernel_input_params))
+                ]
+                scratch_params = ", ".join(all_smem_params + barrier_params)
+
+                code.writeline(
+                    f"def _tma_kernel({', '.join(wrapper_kernel_params)}, *, {scratch_params}):"
+                )
+                with code.indent():
+                    # Define the loop body function
+                    code.writeline("")
+                    code.writeline("def _tile_body(_tile_idx, _):")
+                    with code.indent():
+                        code.writeline("_tile_start = _tile_idx * _tile_size")
+                        code.writeline("")
+
+                        # TMA load inputs from GMEM to SMEM
+                        code.writeline(
+                            "# TMA load inputs from GMEM to SMEM (OOB auto-masked)"
+                        )
+                        for i, (gmem_in, smem_in) in enumerate(
+                            zip(gmem_input_params, smem_input_params)
+                        ):
+                            code.writeline(
+                                f"plgpu.copy_gmem_to_smem({gmem_in}.at[pl.ds(_tile_start, _tile_size)], {smem_in}, _barrier_{i})"
+                            )
+
+                        # Wait for all input loads
+                        code.writeline("")
+                        code.writeline("# Wait for TMA loads to complete")
+                        for i, _ in enumerate(gmem_input_params):
+                            code.writeline(f"plgpu.barrier_wait(_barrier_{i})")
+
+                        # Call the original kernel function with SMEM refs
+                        code.writeline("")
+                        code.writeline("# Compute on SMEM tiles")
+                        kernel_call_args = smem_input_params + smem_output_params
+                        kernel_fn = kernel_arg.rstrip(",").strip()
+                        code.writeline(f"{kernel_fn}({', '.join(kernel_call_args)})")
+
+                        # TMA store outputs from SMEM to GMEM
+                        code.writeline("")
+                        code.writeline(
+                            "# TMA store outputs from SMEM to GMEM (OOB auto-masked)"
+                        )
+                        code.writeline("plgpu.commit_smem()")
+                        for gmem_out, smem_out in zip(
+                            gmem_output_params, smem_output_params
+                        ):
+                            code.writeline(
+                                f"plgpu.copy_smem_to_gmem({smem_out}, {gmem_out}.at[pl.ds(_tile_start, _tile_size)])"
+                            )
+                        code.writeline("plgpu.wait_smem_to_gmem(0)")
+                        code.writeline("")
+                        code.writeline("return None")
+
+                    # Run the loop over all tiles
+                    code.writeline("")
+                    code.writeline("# Iterate over all tiles")
+                    code.writeline("lax.fori_loop(0, _num_tiles, _tile_body, None)")
+
+                # Build scratch_shapes dict for SMEM buffers and TMA barriers
+                code.writeline("")
+                code.writeline(
+                    "# Build SMEM scratch shapes for inputs, outputs, and TMA barriers"
+                )
+                code.writeline("_scratch_shapes = {}")
+                for i, smem_param in enumerate(smem_input_params):
+                    # Get dtype from input param
+                    orig_param = kernel_input_params[i]
+                    code.writeline(
+                        f"_scratch_shapes['{smem_param}'] = plgpu.SMEM((_tile_size,), {orig_param}.dtype)"
+                    )
+                for i, smem_param in enumerate(smem_output_params):
+                    code.writeline(
+                        f"_scratch_shapes['{smem_param}'] = plgpu.SMEM((_tile_size,), out_dtypes[{i}])"
+                    )
+                # Add barriers for TMA GMEM->SMEM operations
+                for barrier_param in barrier_params:
+                    code.writeline(
+                        f"_scratch_shapes['{barrier_param}'] = plgpu.Barrier(num_arrivals=1)"
+                    )
+
+                # Create flattened and aligned output specs for TMA
+                code.writeline("")
+                code.writeline("# Create flattened output specs aligned to tile size")
+                code.writeline("_flat_out_specs = []")
+                code.writeline("for shape, dtype in zip(out_shapes, out_dtypes):")
+                code.writeline("    _numel = 1")
+                code.writeline("    for s in shape:")
+                code.writeline("        _numel *= s")
+                code.writeline(
+                    "    _aligned_numel = ((_numel + _tile_size - 1) // _tile_size) * _tile_size"
+                )
+                code.writeline(
+                    "    _flat_out_specs.append(jax.ShapeDtypeStruct((_aligned_numel,), dtype))"
+                )
+                code.writeline("_flat_out_specs = tuple(_flat_out_specs)")
+
+                # Call plgpu.kernel with the TMA kernel
+                code.writeline("")
+                code.writeline("# Call plgpu.kernel with TMA kernel")
+                code.writeline("_result = plgpu.kernel(")
+                with code.indent():
+                    code.writeline("_tma_kernel,")
+                    code.writeline("out_shape=_flat_out_specs,")
+                    code.writeline("scratch_shapes=_scratch_shapes,")
+                code.writeline(")(")
+                # Pass flattened inputs for 1D tiled processing
+                for param in kernel_input_params:
+                    code.writeline(f"    {param}.flatten(),")
+                code.writeline(")")
+
+                # Reshape outputs to original shapes
+                code.writeline("")
+                code.writeline("# Reshape results to original shapes")
+                code.writeline("if not isinstance(_result, tuple):")
+                code.writeline("    _result = (_result,)")
+                code.writeline("_final_results = []")
+                code.writeline("for _res, _shape in zip(_result, _orig_out_shapes):")
+                code.writeline("    _orig_numel = 1")
+                code.writeline("    for _s in _shape:")
+                code.writeline("        _orig_numel *= _s")
+                code.writeline(
+                    "    _final_results.append(_res[:_orig_numel].reshape(_shape))"
+                )
+                code.writeline(
+                    "return _final_results[0] if len(_final_results) == 1 else tuple(_final_results)"
+                )
+            elif self.is_gpu:
+                # Legacy GPU path with explicit padding (use_emit_pipeline=False)
                 # For GPU, pad inputs to align to WARPGROUP_SIZE (128)
                 # Mosaic GPU requires tensor sizes to be multiples of 128
                 # BUT: only apply padding when all tensors have the same size
@@ -3334,8 +5342,28 @@ def _pallas_partial_reduce(reduce_fn, v, pw_numel, red_numel):
                             f"{alias_name}_jax = jax.device_put({alias_name}.cpu().numpy(), device=jax.devices('tpu')[0])"
                         )
                     else:
+                        # Must call .contiguous() - JAX DLPack only supports compact striding
+                        # Use numpy conversion for unsupported dtypes (bool, bfloat16)
                         code.writeline(
-                            f"{alias_name}_jax = jax.dlpack.from_dlpack({alias_name}.detach())"
+                            f"{alias_name}_tensor = {alias_name}.detach().contiguous()"
+                        )
+                        code.writeline(
+                            f"if {alias_name}_tensor.dtype == torch.bool:"
+                        )
+                        code.writeline(
+                            f"    {alias_name}_jax = jax.device_put(jnp.asarray({alias_name}_tensor.numpy()), device=jax.devices('cpu')[0])"
+                        )
+                        code.writeline(
+                            f"elif {alias_name}_tensor.dtype == torch.bfloat16:"
+                        )
+                        code.writeline(
+                            f"    {alias_name}_jax = jax.device_put(jnp.asarray({alias_name}_tensor.to(torch.float32).numpy(), dtype=jnp.bfloat16), device=jax.devices('cpu')[0])"
+                        )
+                        code.writeline(
+                            f"else:"
+                        )
+                        code.writeline(
+                            f"    {alias_name}_jax = jax.device_put(jax.dlpack.from_dlpack({alias_name}_tensor), device=jax.devices('cpu')[0])"
                         )
             code.writeline("# Convert Torch -> JAX for in-place tensors")
             for ptr in pointer_tail:
@@ -3345,8 +5373,28 @@ def _pallas_partial_reduce(reduce_fn, v, pw_numel, red_numel):
                             f"{ptr}_jax = jax.device_put({ptr}.cpu().numpy(), device=jax.devices('tpu')[0])"
                         )
                     else:
+                        # Must call .contiguous() - JAX DLPack only supports compact striding
+                        # Use numpy conversion for unsupported dtypes (bool, bfloat16)
                         code.writeline(
-                            f"{ptr}_jax = jax.dlpack.from_dlpack({ptr}.detach())"
+                            f"{ptr}_tensor = {ptr}.detach().contiguous()"
+                        )
+                        code.writeline(
+                            f"if {ptr}_tensor.dtype == torch.bool:"
+                        )
+                        code.writeline(
+                            f"    {ptr}_jax = jax.device_put(jnp.asarray({ptr}_tensor.numpy()), device=jax.devices('cpu')[0])"
+                        )
+                        code.writeline(
+                            f"elif {ptr}_tensor.dtype == torch.bfloat16:"
+                        )
+                        code.writeline(
+                            f"    {ptr}_jax = jax.device_put(jnp.asarray({ptr}_tensor.to(torch.float32).numpy(), dtype=jnp.bfloat16), device=jax.devices('cpu')[0])"
+                        )
+                        code.writeline(
+                            f"else:"
+                        )
+                        code.writeline(
+                            f"    {ptr}_jax = jax.device_put(jax.dlpack.from_dlpack({ptr}_tensor), device=jax.devices('cpu')[0])"
                         )
             code.writeline("# Convert Torch -> JAX for inputs")
             for ptr in pointer_tail:
@@ -3355,32 +5403,37 @@ def _pallas_partial_reduce(reduce_fn, v, pw_numel, red_numel):
                         code.writeline(
                             f"{ptr}_jax = jax.device_put({ptr}.cpu().numpy(), device=jax.devices('tpu')[0])"
                         )
-                    elif self.use_masked_ops:
-                        # For masked ops, flatten inputs to 1D for Mosaic compatibility
-                        code.writeline(
-                            f"{ptr}_jax = jax.dlpack.from_dlpack({ptr}.detach().contiguous().flatten())"
-                        )
                     else:
+                        # Must call .contiguous() - JAX DLPack only supports compact striding
+                        # Use numpy conversion for unsupported dtypes (bool, bfloat16)
                         code.writeline(
-                            f"{ptr}_jax = jax.dlpack.from_dlpack({ptr}.detach().contiguous())"
+                            f"{ptr}_tensor = {ptr}.detach().contiguous()"
+                        )
+                        code.writeline(
+                            f"if {ptr}_tensor.dtype == torch.bool:"
+                        )
+                        code.writeline(
+                            f"    {ptr}_jax = jax.device_put(jnp.asarray({ptr}_tensor.numpy()), device=jax.devices('cpu')[0])"
+                        )
+                        code.writeline(
+                            f"elif {ptr}_tensor.dtype == torch.bfloat16:"
+                        )
+                        code.writeline(
+                            f"    {ptr}_jax = jax.device_put(jnp.asarray({ptr}_tensor.to(torch.float32).numpy(), dtype=jnp.bfloat16), device=jax.devices('cpu')[0])"
+                        )
+                        code.writeline(
+                            f"else:"
+                        )
+                        code.writeline(
+                            f"    {ptr}_jax = jax.device_put(jax.dlpack.from_dlpack({ptr}_tensor), device=jax.devices('cpu')[0])"
                         )
 
             code.writeline("# Prepare output metadata from PyTorch tensor")
-            if self.use_masked_ops:
-                # For masked ops, flatten multi-D tensors to 1D for Mosaic compatibility
-                code.writeline(
-                    "out_shapes = ("
-                    + ", ".join(
-                        [f"(math.prod({name}.shape),)" for name in output_params]
-                    )
-                    + ",)"
-                )
-            else:
-                code.writeline(
-                    "out_shapes = ("
-                    + ", ".join([f"tuple({name}.shape)" for name in output_params])
-                    + ",)"
-                )
+            code.writeline(
+                "out_shapes = ("
+                + ", ".join([f"tuple({name}.shape)" for name in output_params])
+                + ",)"
+            )
             code.writeline(
                 "out_dtypes = ("
                 + ", ".join(
@@ -3410,20 +5463,30 @@ def _pallas_partial_reduce(reduce_fn, v, pw_numel, red_numel):
                 )
                 for idx in copy_output_indices:
                     name = output_params[idx]
-                    if is_tpu:
-                        code.writeline(
-                            f"res_cpu = jax.device_get(result_values[{idx}])"
-                        )
-                        code.writeline(f"{name}.copy_(torch.from_dlpack(res_cpu))")
-                    elif self.use_masked_ops:
-                        # For masked ops, result is flattened, reshape back to original shape
-                        code.writeline(
-                            f"{name}.copy_(torch.from_dlpack(result_values[{idx}]).reshape({name}.shape))"
-                        )
-                    else:
-                        code.writeline(
-                            f"{name}.copy_(torch.from_dlpack(result_values[{idx}]))"
-                        )
+                    # Use jax.device_get to ensure array is on CPU before dlpack transfer
+                    code.writeline(
+                        f"res_cpu = jax.device_get(result_values[{idx}])"
+                    )
+                    # DLPack doesn't support bool dtype or numpy bfloat16
+                    # Convert unsupported types through intermediate dtype
+                    code.writeline(
+                        f"if res_cpu.dtype == jnp.bool_:"
+                    )
+                    code.writeline(
+                        f"    {name}.copy_(torch.from_dlpack(res_cpu.astype(jnp.uint8)).to(torch.bool))"
+                    )
+                    code.writeline(
+                        f"elif res_cpu.dtype == jnp.bfloat16:"
+                    )
+                    code.writeline(
+                        f"    {name}.copy_(torch.from_dlpack(res_cpu.astype(jnp.float32)).to(torch.bfloat16))"
+                    )
+                    code.writeline(
+                        f"else:"
+                    )
+                    code.writeline(
+                        f"    {name}.copy_(torch.from_dlpack(res_cpu))"
+                    )
 
         return code.getvalue()
 

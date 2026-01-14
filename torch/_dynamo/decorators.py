@@ -336,7 +336,7 @@ def leaf_function(fn: Callable[_P, _R]) -> Callable[_P, _R]:
           so do not use this for training.
 
     Restrictions:
-        - (Temporary) Return value should be a tuple of tensors.
+        - Return value should be a pytree of tensors.
 
     Example:
         # Simple usage - function itself is used as fake_impl:

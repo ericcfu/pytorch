@@ -121,6 +121,7 @@ from .source import (
     AttrSource,
     CallFunctionNoArgsSource,
     CallMethodItemSource,
+    CellContentsSource,
     ChainedSource,
     ClosureSource,
     CodeSource,
@@ -813,9 +814,22 @@ def get_verbose_code_parts(
     verbose_code_parts = [
         get_verbose_code_part(code_part, guard) for code_part in code_parts
     ]
+
+    # For CellContentsSource, add a hint explaining which closure variable is being checked
+    # This helps users understand which closure variable caused the guard failure
+    if (
+        guard is not None
+        and isinstance(source := guard.originating_source, CellContentsSource)
+        and source.freevar_name
+    ):
+        closure_hint = f'{source.name} refers to "{source.freevar_name}" in user code'
+        recompile_hint = (
+            f"{closure_hint}, {recompile_hint}" if recompile_hint else closure_hint
+        )
+
     if recompile_hint:
         verbose_code_parts = [
-            f"{part} (HINT: {recompile_hint})" for part in verbose_code_parts
+            f"{part} [HINT: {recompile_hint}]" for part in verbose_code_parts
         ]
 
     return verbose_code_parts
@@ -1480,7 +1494,9 @@ class GuardBuilder(GuardBuilderBase):
                 example_value=example_value,
                 guard_manager_enum=guard_manager_enum,
             )
-        elif istype(source, (AttrSource, UnspecializedParamBufferSource)):
+        elif istype(
+            source, (AttrSource, CellContentsSource, UnspecializedParamBufferSource)
+        ):
             assert base_guard_manager  # to make mypy happy
             assert isinstance(source, AttrSource)
             if should_optimize_getattr_on_nn_module(base_example_value):
